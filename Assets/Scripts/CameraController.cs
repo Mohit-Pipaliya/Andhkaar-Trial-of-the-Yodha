@@ -5,47 +5,50 @@ public class CameraController : MonoBehaviour
 {
     [Header("Target Setup")]
     public Transform target;
-    public Vector3 targetOffset = new Vector3(0, 1.5f, 0);
+    public Vector3 targetOffset = new Vector3(0f, 1.5f, 0f);
 
-    [Header("Distance & Collision")]
-    public float defaultDistance = 4f;
-    public float minDistance = 1f;
-    public float cameraCollisionRadius = 0.3f;
+    [Header("Distance Settings")]
+    public float defaultDistance = 5f;
+    public float minDistance     = 1f;
+    public float cameraCollisionRadius = 0.2f;
     public LayerMask collisionMask;
 
-    [Header("Look Settings")]
-    public float mouseSensitivity = 1f; // Choti value kyonki ye raw delta use kar raha hai
-    public float minPitch = -35f;
+    [Header("Mouse Y Sensitivity")]
+    public float sensitivityY = 80f;
+    public float minPitch = -20f;
     public float maxPitch = 60f;
-    
-    [Header("Smoothness")]
-    public float smoothSpeed = 10f;
 
-    private float pitch = 0f;
-    private float yaw = 0f;
+    [Header("Follow Smoothing (SmoothDamp)")]
+    public float positionSmoothTime  = 0.05f; // Extremely tight follow to prevent shake
+    public float verticalSmoothTime  = 0.2f;  
+
+    // Internal
+    private float pitch = 10f;
     private float currentDistance;
+    private float distanceVelocity;
 
-    // --- New Input System Actions ---
+    private Vector3 posVelocity = Vector3.zero;
+    private float   smoothedY;
+    private float   smoothedYVelocity;
+
+    private PlayerController playerController;
     private InputAction lookAction;
 
     void Awake()
     {
-        // Mouse Delta ko padhne ke liye Setup
         lookAction = new InputAction("Look", binding: "<Pointer>/delta");
     }
 
-    void OnEnable() { lookAction.Enable(); }
-    void OnDisable() { lookAction.Disable(); }
+    void OnEnable()  => lookAction.Enable();
+    void OnDisable() => lookAction.Disable();
 
     void Start()
     {
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
         currentDistance = defaultDistance;
-
         if (target != null)
         {
-            yaw = target.eulerAngles.y;
+            smoothedY = target.position.y + targetOffset.y;
+            playerController = target.GetComponent<PlayerController>();
         }
     }
 
@@ -53,42 +56,49 @@ public class CameraController : MonoBehaviour
     {
         if (target == null) return;
 
-        // 1. Mouse Input (New Input System se)
-        Vector2 lookDelta = lookAction.ReadValue<Vector2>();
-        
-        float mouseX = lookDelta.x * mouseSensitivity * 0.1f;
-        float mouseY = lookDelta.y * mouseSensitivity * 0.1f;
+        bool isSliding = playerController != null && playerController.IsSliding;
 
-        // Player ko Left/Right ghumana mouse ke hisaab se
-        target.Rotate(Vector3.up * mouseX);
-
-        // Camera ka Pitch (Up/Down) aur Yaw (Left/Right)
-        pitch -= mouseY;
+        // ── 1. MOUSE Y INPUT (Pitch) ─────────
+        Vector2 delta = lookAction.ReadValue<Vector2>();
+        // pitch -= delta.y * sensitivityY * Time.deltaTime; // Trackpad/Mouse se up/down band kiya
         pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
-        
-        yaw = target.eulerAngles.y;
 
-        // 2. Camera ka desired position
-        Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
-        Vector3 lookPosition = target.position + targetOffset;
-        Vector3 desiredPosition = lookPosition - (rotation * Vector3.forward * defaultDistance);
+        if (isSliding) 
+            pitch = Mathf.Lerp(pitch, 35f, Time.deltaTime * 8f); // Temple Run style: look down from top
 
-        // 3. Collision Detection (Tunnel/Cave Logic)
+        // ── 2. CAMERA YAW (Lock exactly to player) ─────────
+        // Mouse X rotation is handled entirely by PlayerController now.
+        // We just snap exactly to the player's rotation to prevent jitter.
+        float yaw = target.eulerAngles.y;
+
+        // ── 3. PIVOT POINT (Absorb jump/run bounce) ─────────
+        float currentYOffset = isSliding ? (targetOffset.y - 1.2f) : targetOffset.y; // Camera low near the player
+        float rawY = target.position.y + currentYOffset;
+
+        float currentVerticalSmooth = isSliding ? 0.1f : verticalSmoothTime;
+        smoothedY = Mathf.SmoothDamp(smoothedY, rawY, ref smoothedYVelocity, currentVerticalSmooth);
+
+        Vector3 pivot = new Vector3(
+            target.position.x + targetOffset.x,
+            smoothedY,
+            target.position.z + targetOffset.z
+        );
+
+        // ── 4. DESIRED POSITION & COLLISION ─────────
+        Quaternion camRot = Quaternion.Euler(pitch, yaw, 0f);
+        Vector3 camDir = camRot * Vector3.back; 
+
+        float targetDist = isSliding ? defaultDistance * 0.9f : defaultDistance; // Closer to player to show slide clearly
         RaycastHit hit;
-        Vector3 direction = desiredPosition - lookPosition;
-        
-        if (Physics.SphereCast(lookPosition, cameraCollisionRadius, direction.normalized, out hit, defaultDistance, collisionMask))
-        {
-            currentDistance = hit.distance;
-        }
-        else
-        {
-            currentDistance = defaultDistance;
-        }
+        if (Physics.SphereCast(pivot, cameraCollisionRadius, camDir, out hit, targetDist, collisionMask))
+            targetDist = Mathf.Max(hit.distance - 0.1f, minDistance);
 
-        // 4. Final Position lagana (Lerp for smoothness)
-        Vector3 finalPosition = lookPosition - (rotation * Vector3.forward * currentDistance);
-        transform.position = Vector3.Lerp(transform.position, finalPosition, Time.deltaTime * smoothSpeed);
-        transform.rotation = rotation;
+        currentDistance = Mathf.SmoothDamp(currentDistance, targetDist, ref distanceVelocity, 0.1f);
+        Vector3 desiredPos = pivot + camDir * currentDistance;
+
+        // ── 5. APPLY WITH TIGHT SMOOTHDAMP ─────────
+        // Fast damp completely eliminates the 'trailing shake' effect
+        transform.position = Vector3.SmoothDamp(transform.position, desiredPos, ref posVelocity, positionSmoothTime);
+        transform.rotation = camRot;
     }
 }
