@@ -13,16 +13,17 @@ public class CameraController : MonoBehaviour
     public float cameraCollisionRadius = 0.2f;
     public LayerMask collisionMask;
 
-    [Header("Mouse Y Sensitivity")]
+    [Header("Mouse Sensitivity")]
+    public float sensitivityX = 150f;
     public float sensitivityY = 80f;
     public float minPitch = -20f;
     public float maxPitch = 60f;
 
-    [Header("Follow Smoothing (SmoothDamp)")]
-    public float positionSmoothTime  = 0.05f; // Extremely tight follow to prevent shake
+    [Header("Follow Smoothing")]
     public float verticalSmoothTime  = 0.2f;  
 
     // Internal
+    private float yaw = 0f;
     private float pitch = 10f;
     private float currentDistance;
     private float distanceVelocity;
@@ -47,6 +48,7 @@ public class CameraController : MonoBehaviour
         currentDistance = defaultDistance;
         if (target != null)
         {
+            yaw = target.eulerAngles.y;
             smoothedY = target.position.y + targetOffset.y;
             playerController = target.GetComponent<PlayerController>();
         }
@@ -66,10 +68,8 @@ public class CameraController : MonoBehaviour
         if (isSliding) 
             pitch = Mathf.Lerp(pitch, 35f, Time.deltaTime * 8f); // Temple Run style: look down from top
 
-        // ── 2. CAMERA YAW (Lock exactly to player) ─────────
-        // Mouse X rotation is handled entirely by PlayerController now.
-        // We just snap exactly to the player's rotation to prevent jitter.
-        float yaw = target.eulerAngles.y;
+        // ── 2. CAMERA YAW (Mouse X) ─────────
+        yaw += delta.x * sensitivityX * Time.deltaTime;
 
         // ── 3. PIVOT POINT (Absorb jump/run bounce) ─────────
         float currentYOffset = isSliding ? (targetOffset.y - 1.2f) : targetOffset.y; // Camera low near the player
@@ -96,9 +96,9 @@ public class CameraController : MonoBehaviour
         currentDistance = Mathf.SmoothDamp(currentDistance, targetDist, ref distanceVelocity, 0.1f);
         Vector3 desiredPos = pivot + camDir * currentDistance;
 
-        // ── 5. APPLY WITH TIGHT SMOOTHDAMP ─────────
-        // Fast damp completely eliminates the 'trailing shake' effect
-        transform.position = Vector3.SmoothDamp(transform.position, desiredPos, ref posVelocity, positionSmoothTime);
+        // ── 5. APPLY DIRECTLY ─────────
+        // Horizontal smooth damp hatana zaroori hai nahi toh player screen par vibrate/shake karta hua dikhta hai
+        transform.position = desiredPos;
         transform.rotation = camRot;
     }
 }
