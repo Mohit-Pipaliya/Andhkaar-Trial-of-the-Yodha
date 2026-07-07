@@ -87,14 +87,47 @@ public class PlayerController : MonoBehaviour
     private bool isSliding = false;
 
     // ═══════════════════════════════════════════════════════════
-    //  ITEM STATES
+    //  QUEST & SPECIAL ABILITIES
     // ═══════════════════════════════════════════════════════════
-    [Header("Item States")]
+    [Header("Quest Progression")]
+    public bool hasSpecialObject1 = false;
+    public bool hasSpecialObject2 = false;
+    public bool hasSpecialObject3 = false;
+
+    // Trigger States
+    private bool inTrigger1 = false;
+    private bool inTrigger2 = false;
+    private bool inTrigger3 = false;
+
+    // ═══════════════════════════════════════════════════════════
+    //  ITEM STATES & WEAPONS
+    // ═══════════════════════════════════════════════════════════
+    public enum WeaponType { None = 0, Sword1 = 1, Sword2 = 2 }
+
+    [Header("Weapons")]
+    public WeaponType currentWeapon = WeaponType.None;
+    public bool hasSword1 = false;
+    public bool hasSword2 = false;
+    
+    [Tooltip("Hand bone pe attached Sword 1 GameObject")]
+    public GameObject handSword1Object;
+    [Tooltip("Hand bone pe attached Sword 2 GameObject")]
+    public GameObject handSword2Object;
+
+    [Header("Torch States")]
     public bool hasTorch = false;
 
     [Header("Torch — Dual Object Setup")]
     [Tooltip("Player ke haath ka lamp GameObject — Editor mein position set karo, script shuru mein hide kar degi")]
     public GameObject handLampObject;       // Haath waala lamp (pre-positioned)
+
+    [Tooltip("Hand Lamp ke andar jo Point Light hai, use yahan drag karein")]
+    public Light handLampLight;
+
+    [Tooltip("Kitni tezi se oil kam hoga (Bada number = jaldi khatam).")]
+    public float lampDrainRate = 5f; // 100 intensity / 5 = 20 seconds mein khatam
+    [Tooltip("Light ki starting intensity.")]
+    public float maxLampIntensity = 100f;
 
     [Tooltip("Hand bone Transform jis par HandLamp ko attach karna hai (e.g. Left Hand bone)")]
     public Transform handBone;              // Inspector mein Left Hand bone drag karo
@@ -103,6 +136,9 @@ public class PlayerController : MonoBehaviour
     public float pickupRange = 2.5f;        // Badhao to zyada dur se pickup ho
 
     private GameObject activeGroundLamp;    // Jo lamp pick kiya gaya hai (drop reference)
+    private Coroutine lampDrainCoroutine;   // Coroutine reference for lamp point light intensity drain
+    private GameObject activeGroundSword1;  // Drop reference for sword 1
+    private GameObject activeGroundSword2;  // Drop reference for sword 2
 
     // ═══════════════════════════════════════════════════════════
     //  PRIVATE — PHYSICS
@@ -145,8 +181,16 @@ public class PlayerController : MonoBehaviour
     private InputAction slideAction;
     private InputAction lookAction;
     private InputAction attackAction;
-    private InputAction interactAction;
-    private InputAction dropAction;
+    private InputAction interactWeaponAction;
+    private InputAction interactLampAction;
+    private InputAction dropWeaponAction;
+    private InputAction dropLampAction;
+    private InputAction specialAction;
+
+    // ── Weapon Inputs ──────────────────────────────────────────
+    private InputAction equipNoneAction;
+    private InputAction equipSword1Action;
+    private InputAction equipSword2Action;
 
     // ── Public property ─────────────────────────────────────────
     public bool IsSliding => isSliding;
@@ -157,33 +201,53 @@ public class PlayerController : MonoBehaviour
     void Awake()
     {
         moveAction = new InputAction("Move", type: InputActionType.Value);
+        
+        // Add WASD bindings
         moveAction.AddCompositeBinding("2DVector")
             .With("Up",    "<Keyboard>/w")
             .With("Down",  "<Keyboard>/s")
             .With("Left",  "<Keyboard>/a")
             .With("Right", "<Keyboard>/d");
 
+        // Add Arrow Key bindings
+        moveAction.AddCompositeBinding("2DVector")
+            .With("Up",    "<Keyboard>/upArrow")
+            .With("Down",  "<Keyboard>/downArrow")
+            .With("Left",  "<Keyboard>/leftArrow")
+            .With("Right", "<Keyboard>/rightArrow");
+
         runAction      = new InputAction("Run",      type: InputActionType.Button, binding: "<Keyboard>/leftShift");
         jumpAction     = new InputAction("Jump",     type: InputActionType.Button, binding: "<Keyboard>/space");
         slideAction    = new InputAction("Slide",    type: InputActionType.Button, binding: "<Keyboard>/leftCtrl");
-        attackAction   = new InputAction("Attack",   type: InputActionType.Button, binding: "<Mouse>/leftButton");
-        interactAction = new InputAction("Interact", type: InputActionType.Button, binding: "<Keyboard>/o");
-        dropAction     = new InputAction("Drop",     type: InputActionType.Button, binding: "<Keyboard>/g");
-        lookAction     = new InputAction("Look",     binding: "<Pointer>/delta");
+        attackAction         = new InputAction("Attack",         type: InputActionType.Button, binding: "<Mouse>/leftButton");
+        interactWeaponAction = new InputAction("InteractWeapon", type: InputActionType.Button, binding: "<Keyboard>/e");
+        interactLampAction   = new InputAction("InteractLamp",   type: InputActionType.Button, binding: "<Keyboard>/o");
+        dropWeaponAction     = new InputAction("DropWeapon",     type: InputActionType.Button, binding: "<Keyboard>/g");
+        dropLampAction       = new InputAction("DropLamp",       type: InputActionType.Button, binding: "<Keyboard>/l");
+        lookAction           = new InputAction("Look",           binding: "<Pointer>/delta");
+        specialAction        = new InputAction("Special",        type: InputActionType.Button, binding: "<Keyboard>/m");
+
+        equipNoneAction   = new InputAction("EquipNone",   type: InputActionType.Button, binding: "<Keyboard>/1");
+        equipSword1Action = new InputAction("EquipSword1", type: InputActionType.Button, binding: "<Keyboard>/2");
+        equipSword2Action = new InputAction("EquipSword2", type: InputActionType.Button, binding: "<Keyboard>/3");
     }
 
     void OnEnable()
     {
         moveAction.Enable(); runAction.Enable(); jumpAction.Enable();
         slideAction.Enable(); lookAction.Enable(); attackAction.Enable();
-        interactAction.Enable(); dropAction.Enable();
+        interactWeaponAction.Enable(); interactLampAction.Enable(); dropWeaponAction.Enable(); dropLampAction.Enable();
+        equipNoneAction.Enable(); equipSword1Action.Enable(); equipSword2Action.Enable();
+        specialAction.Enable();
     }
 
     void OnDisable()
     {
         moveAction.Disable(); runAction.Disable(); jumpAction.Disable();
         slideAction.Disable(); lookAction.Disable(); attackAction.Disable();
-        interactAction.Disable(); dropAction.Disable();
+        interactWeaponAction.Disable(); interactLampAction.Disable(); dropWeaponAction.Disable(); dropLampAction.Disable();
+        equipNoneAction.Disable(); equipSword1Action.Disable(); equipSword2Action.Disable();
+        specialAction.Disable();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -195,7 +259,12 @@ public class PlayerController : MonoBehaviour
         animator             = GetComponentInChildren<Animator>();
         mainCameraTransform  = Camera.main.transform;
 
-        animator.applyRootMotion = false;
+        if (controller == null) Debug.LogError("PlayerController: CharacterController is missing!");
+        if (animator == null) Debug.LogWarning("PlayerController: Animator is missing!");
+        if (mainCameraTransform == null) Debug.LogWarning("PlayerController: Main Camera is missing!");
+
+        if (animator != null)
+            animator.applyRootMotion = false;
 
         // Safe skin width — prevents sliding on slopes
         controller.skinWidth = controller.radius * 0.1f;
@@ -210,6 +279,17 @@ public class PlayerController : MonoBehaviour
         // Editor mein position adjust kar sakte ho, play pe automatically hidden hoga
         if (handLampObject != null)
             handLampObject.SetActive(false);
+
+        if (handLampLight != null)
+            handLampLight.enabled = false;
+
+        if (handSword1Object != null)
+            handSword1Object.SetActive(false);
+
+        if (handSword2Object != null)
+            handSword2Object.SetActive(false);
+            
+        UpdateWeaponState(WeaponType.None);
 
         // ── Derive physics values from designer-friendly inputs ──
         // Using kinematic equations:
@@ -279,7 +359,8 @@ public class PlayerController : MonoBehaviour
             jumpBufferCounter -= Time.deltaTime;
 
         // ─── 4. CROUCH / SLIDE ──────────────────────────────────
-        if (isSlideHeld && groundedNow && !isSliding)
+        // Only allow crouch/slide if player has collected the oil lamp (hasTorch is true)
+        if (isSlideHeld && groundedNow && !isSliding && hasTorch)
         {
             isSliding = true;
             float targetHeight = originalHeight * slideHeightMultiplier;
@@ -400,23 +481,109 @@ public class PlayerController : MonoBehaviour
         animator.SetBool("IsRunning",  hasInput &&  isRunning && groundedNow && !isSliding);
         animator.SetBool("HasTorch",  hasTorch);
 
-        // ─── 10. TORCH PICKUP (OverlapSphere — trigger collider size matter nahi karta) ─
-        if (interactAction.triggered && !hasTorch)
+        // ─── 10. ITEM PICKUP (Torch & Swords) ───────────────────
+        bool tryingToPickLamp = interactLampAction.triggered;
+        bool tryingToPickWeapon = interactWeaponAction.triggered;
+
+        if (tryingToPickLamp || tryingToPickWeapon)
         {
-            // Player ke aas-paas pickupRange mein koi OilLamp hai?
+            // Player ke aas-paas pickupRange mein objects dhoondo
             Collider[] nearby = Physics.OverlapSphere(transform.position, pickupRange);
             foreach (Collider col in nearby)
             {
-                if (col.CompareTag("OilLamp"))
+                if (tryingToPickLamp && col.CompareTag("OilLamp") && !hasTorch)
                 {
                     EquipTorch(col.gameObject);
+                    break;
+                }
+                else if (tryingToPickWeapon && col.CompareTag("Sword 1") && !hasSword1)
+                {
+                    CollectSword(col.gameObject, 1);
+                    break;
+                }
+                else if (tryingToPickWeapon && col.CompareTag("Sword 2") && !hasSword2)
+                {
+                    CollectSword(col.gameObject, 2);
+                    break;
+                }
+                else if (tryingToPickWeapon && col.CompareTag("OilCan") && hasTorch)
+                {
+                    RefillLamp(col.gameObject);
+                    break;
+                }
+                else if (tryingToPickWeapon && col.CompareTag("specialobject1") && !hasSpecialObject1)
+                {
+                    hasSpecialObject1 = true;
+                    col.gameObject.SetActive(false);
+                    Debug.Log("Collected specialobject1!");
+                    break;
+                }
+                else if (tryingToPickWeapon && col.CompareTag("specialobject2") && !hasSpecialObject2)
+                {
+                    hasSpecialObject2 = true;
+                    col.gameObject.SetActive(false);
+                    Debug.Log("Collected specialobject2!");
+                    break;
+                }
+                else if (tryingToPickWeapon && col.CompareTag("specialobject3") && !hasSpecialObject3)
+                {
+                    hasSpecialObject3 = true;
+                    col.gameObject.SetActive(false);
+                    Debug.Log("Collected specialobject3!");
                     break;
                 }
             }
         }
 
-        if (dropAction.triggered && hasTorch)
+        if (dropLampAction.triggered && hasTorch)
             DropTorch();
+
+        if (dropWeaponAction.triggered && currentWeapon != WeaponType.None)
+            DropWeapon();
+
+        // ─── 11. WEAPON SWITCHING ───────────────────────────────
+        if (equipNoneAction.triggered)
+            UpdateWeaponState(WeaponType.None);
+        if (equipSword1Action.triggered && hasSword1)
+            UpdateWeaponState(WeaponType.Sword1);
+        if (equipSword2Action.triggered && hasSword2)
+            UpdateWeaponState(WeaponType.Sword2);
+
+        // ─── 12. SPECIAL ACTION ─────────────────────────────────
+        if (specialAction.triggered && groundedNow && !isSliding)
+        {
+            if (hasSpecialObject1 && inTrigger1)
+                ExecuteSpecialAction(1);
+            else if (hasSpecialObject2 && inTrigger2)
+                ExecuteSpecialAction(2);
+            else if (hasSpecialObject3 && inTrigger3)
+                ExecuteSpecialAction(3);
+        }
+    }
+
+    private void ExecuteSpecialAction(int gateNumber)
+    {
+        if (isAttacking) return; // Prevent spamming while already in an action/attack
+
+        Debug.Log($"Special Action Triggered for Gate {gateNumber}!");
+        
+        // We use isAttacking flag to reuse the movement slow-down logic during the special animation
+        isAttacking = true; 
+        animator.SetTrigger("Special"); 
+        
+        // Use a default recovery time, adjust based on animation length
+        StartCoroutine(SpecialRecovery(2.5f, gateNumber)); 
+    }
+
+    private System.Collections.IEnumerator SpecialRecovery(float duration, int gateNumber)
+    {
+        yield return new WaitForSeconds(duration);
+        isAttacking = false;
+
+        // Optionally consume the object after animation finishes
+        if (gateNumber == 1) hasSpecialObject1 = false;
+        else if (gateNumber == 2) hasSpecialObject2 = false;
+        else if (gateNumber == 3) hasSpecialObject3 = false;
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -424,6 +591,7 @@ public class PlayerController : MonoBehaviour
     // ═══════════════════════════════════════════════════════════
     private void EquipTorch(GameObject groundLamp)
     {
+        Debug.Log("Equipped Torch!");
         hasTorch         = true;
         activeGroundLamp = groundLamp;
 
@@ -431,15 +599,63 @@ public class PlayerController : MonoBehaviour
         groundLamp.SetActive(false);
 
         // 2. Haath wala lamp dikhao
-        // NOTE: HandLamp pehle se hi hand bone ka CHILD hona chahiye (Unity hierarchy mein)
-        // Script sirf SetActive karta hai — position/parenting editor mein set hoti hai
         if (handLampObject != null)
             handLampObject.SetActive(true);
+
+        // 3. Turn on light instantly and start draining oil smoothly
+        if (handLampLight != null)
+        {
+            handLampLight.enabled = true;
+            handLampLight.intensity = maxLampIntensity;
+            lampDrainCoroutine = StartCoroutine(DrainLampOil());
+        }
+    }
+
+    private System.Collections.IEnumerator DrainLampOil()
+    {
+        while (hasTorch && handLampLight != null && handLampLight.intensity > 0)
+        {
+            // Time.deltaTime se update har frame pe thoda-thoda subtract hoga (realistic feel)
+            handLampLight.intensity -= lampDrainRate * Time.deltaTime;
+            
+            if (handLampLight.intensity < 0)
+                handLampLight.intensity = 0;
+                
+            yield return null; // Next frame tak wait karo
+        }
+    }
+
+    private void RefillLamp(GameObject oilCan)
+    {
+        Debug.Log("Refilled Lamp Oil!");
+        oilCan.SetActive(false); // consume the oil can from the ground
+
+        if (handLampLight != null && hasTorch)
+        {
+            handLampLight.enabled = true; // Make sure it's on
+            handLampLight.intensity = maxLampIntensity;
+            
+            // Restart drain process if stopped
+            if (lampDrainCoroutine != null)
+                StopCoroutine(lampDrainCoroutine);
+                
+            lampDrainCoroutine = StartCoroutine(DrainLampOil());
+        }
     }
 
     private void DropTorch()
     {
+        Debug.Log("Dropped Torch!");
         hasTorch = false;
+
+        if (lampDrainCoroutine != null)
+        {
+            StopCoroutine(lampDrainCoroutine);
+            lampDrainCoroutine = null;
+        }
+
+        if (handLampLight != null)
+            handLampLight.enabled = false;
 
         // 1. Haath wala lamp chhupaao
         if (handLampObject != null)
@@ -466,6 +682,86 @@ public class PlayerController : MonoBehaviour
     }
 
     // ═══════════════════════════════════════════════════════════
+    //  WEAPON METHODS
+    // ═══════════════════════════════════════════════════════════
+    private void CollectSword(GameObject groundSword, int swordType)
+    {
+        Debug.Log($"Collected Sword {swordType}!");
+        groundSword.SetActive(false); // Hide the sword from ground
+        
+        if (swordType == 1)
+        {
+            hasSword1 = true;
+            activeGroundSword1 = groundSword;
+            UpdateWeaponState(WeaponType.Sword1);
+        }
+        else if (swordType == 2)
+        {
+            hasSword2 = true;
+            activeGroundSword2 = groundSword;
+            UpdateWeaponState(WeaponType.Sword2);
+        }
+    }
+
+    private void DropWeapon()
+    {
+        GameObject swordToDrop = null;
+
+        if (currentWeapon == WeaponType.Sword1 && hasSword1)
+        {
+            hasSword1 = false;
+            swordToDrop = activeGroundSword1;
+            activeGroundSword1 = null;
+        }
+        else if (currentWeapon == WeaponType.Sword2 && hasSword2)
+        {
+            hasSword2 = false;
+            swordToDrop = activeGroundSword2;
+            activeGroundSword2 = null;
+        }
+
+        if (swordToDrop != null)
+        {
+            // Drop it near player's feet / front
+            Vector3 dropPosition = transform.position + transform.forward * 0.5f;
+            swordToDrop.transform.position = dropPosition;
+            swordToDrop.SetActive(true);
+
+            // Let physics handle the drop if it has a Rigidbody
+            Rigidbody rb = swordToDrop.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = false;
+                rb.AddForce(transform.forward * 1.5f + Vector3.up * 2f, ForceMode.Impulse);
+            }
+        }
+
+        // Return to empty handed state after dropping weapon
+        UpdateWeaponState(WeaponType.None);
+    }
+
+    private void UpdateWeaponState(WeaponType newWeapon)
+    {
+        if (currentWeapon != newWeapon)
+        {
+            Debug.Log($"Switched weapon to: {newWeapon}");
+        }
+        currentWeapon = newWeapon;
+        
+        if (handSword1Object != null)
+            handSword1Object.SetActive(currentWeapon == WeaponType.Sword1);
+            
+        if (handSword2Object != null)
+            handSword2Object.SetActive(currentWeapon == WeaponType.Sword2);
+            
+        // Animator me weapon type pass kar rahe hain: 0 = None, 1 = Sword1, 2 = Sword2
+        if (animator != null)
+        {
+            animator.SetInteger("WeaponType", (int)currentWeapon);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
     //  ATTACK HANDLER
     // ═══════════════════════════════════════════════════════════
     private void HandleAttack(bool grounded)
@@ -483,7 +779,8 @@ public class PlayerController : MonoBehaviour
         }
 
         // ─ Receive new click ─
-        if (attackAction.triggered && grounded && !isSliding)
+        // Only allow attack if a sword is equipped (currentWeapon != None)
+        if (attackAction.triggered && grounded && !isSliding && currentWeapon != WeaponType.None)
         {
             if (!isAttacking)
             {
@@ -567,7 +864,22 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // OnTrigger methods hata diye — ab OverlapSphere use hoti hai (pickupRange se control)
+    // ═══════════════════════════════════════════════════════════
+    //  TRIGGERS (Gates)
+    // ═══════════════════════════════════════════════════════════
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("GateTrigger1")) inTrigger1 = true;
+        else if (other.CompareTag("GateTrigger2")) inTrigger2 = true;
+        else if (other.CompareTag("GateTrigger3")) inTrigger3 = true;
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("GateTrigger1")) inTrigger1 = false;
+        else if (other.CompareTag("GateTrigger2")) inTrigger2 = false;
+        else if (other.CompareTag("GateTrigger3")) inTrigger3 = false;
+    }
 
     // ═══════════════════════════════════════════════════════════
     //  GIZMOS — Debug visualization in Scene view

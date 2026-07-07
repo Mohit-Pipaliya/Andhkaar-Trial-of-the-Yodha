@@ -1,0 +1,16 @@
+# Blender 5.0.1 MTL File: 'None'
+# www.blender.org
+
+newmtl tripo_mat_035e2f62-d5e6-47cd-9b08-562a07edefca
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd tripo_model_basecolor.JPEG
+map_Ns tripo_model_roughness.JPEG
+map_Pr tripo_model_roughness.JPEG
+map_refl tripo_model_metallic.JPEG
+map_Pm tripo_model_metallic.JPEG
+map_Bump -bm 1.000000 tripo_model_normal.JPEG

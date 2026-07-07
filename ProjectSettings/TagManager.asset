@@ -5,6 +5,9 @@ TagManager:
   serializedVersion: 3
   tags:
   - OilLamp
+  - Sword 1
+  - Sword 2
+  - OilCan
   layers:
   - Default
   - TransparentFX
