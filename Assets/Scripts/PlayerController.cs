@@ -57,6 +57,7 @@ public class PlayerController : MonoBehaviour
 
     // ─── Private Attack State ──────────────────────────────────
     private bool  isAttacking       = false;    // Are we currently in an attack animation?
+    private bool  isSpecialActionPlaying = false; // Are we locked in a cutscene/special action?
     private bool  comboQueued       = false;    // Next attack buffered during current swing?
     private float comboWindowTimer  = 0f;       // Countdown for combo window
     private int   currentComboStep  = 0;        // Which hit in the combo (1, 2, 3)
@@ -89,15 +90,43 @@ public class PlayerController : MonoBehaviour
     // ═══════════════════════════════════════════════════════════
     //  QUEST & SPECIAL ABILITIES
     // ═══════════════════════════════════════════════════════════
-    [Header("Quest Progression")]
-    public bool hasSpecialObject1 = false;
-    public bool hasSpecialObject2 = false;
-    public bool hasSpecialObject3 = false;
+    [Header("Quest Progression (Gates & Objects)")]
+    [Tooltip("Drag the 3 specific objects from the scene here")]
+    public GameObject[] specialObjects = new GameObject[3];
+    
+    [Tooltip("Drag the 3 Pray Trigger objects (where player presses M) here")]
+    public Transform[] prayTriggers = new Transform[3];
+    
+    [Tooltip("Drag the 3 Placed Trigger objects (where object flies to) here")]
+    public Transform[] placeTriggers = new Transform[3];
+    
+    [Tooltip("Drag the 3 Gate objects here (they will slide down when opened)")]
+    public GameObject[] gates = new GameObject[3];
 
-    // Trigger States
-    private bool inTrigger1 = false;
-    private bool inTrigger2 = false;
-    private bool inTrigger3 = false;
+    [Header("Quest — Tuning")]
+    [Tooltip("Crystal absorb hone mein kitna time lagega (seconds)")]
+    public float absorbDuration = 1.5f;          // Slow absorption
+
+    [Tooltip("Point Light ke fly hone ki speed (seconds)")]
+    public float lightFlyDuration = 2.5f;        // Exact match with magic animation length
+
+    [Tooltip("Jab Light haath se nikle tab intensity kitni hogi (bright glow)")]
+    public float lightReleaseIntensity = 15f;
+
+    [Tooltip("Jab Light placed ho jaye tab normal intensity kitni hogi")]
+    public float lightNormalIntensity = 3f;
+
+    [Tooltip("Gate 1 kitne units neeche slide karega")]
+    public float gate1SlideDistance = 8f;
+    [Tooltip("Gate 2 kitne units neeche slide karega")]
+    public float gate2SlideDistance = 8f;
+    [Tooltip("Gate 3 kitne units neeche slide karega")]
+    public float gate3SlideDistance = 8f;
+
+    // Hidden tracking states
+    [HideInInspector] public bool[] hasSpecialObject = new bool[3];
+    [HideInInspector] public bool[] inPrayTrigger = new bool[3];
+    [HideInInspector] public Transform[] specialLights = new Transform[3];
 
     // ═══════════════════════════════════════════════════════════
     //  ITEM STATES & WEAPONS
@@ -125,12 +154,15 @@ public class PlayerController : MonoBehaviour
     public Light handLampLight;
 
     [Tooltip("Kitni tezi se oil kam hoga (Bada number = jaldi khatam).")]
-    public float lampDrainRate = 5f; // 100 intensity / 5 = 20 seconds mein khatam
+    public float lampDrainRate = 2f; // 100 intensity / 2 = 50 seconds mein khatam (dheere dheere)
     [Tooltip("Light ki starting intensity.")]
     public float maxLampIntensity = 100f;
 
     [Tooltip("Hand bone Transform jis par HandLamp ko attach karna hai (e.g. Left Hand bone)")]
     public Transform handBone;              // Inspector mein Left Hand bone drag karo
+
+    [Tooltip("Dusre haath ka bone (e.g. Right Hand bone) dono haath se magic nikalne ke liye")]
+    public Transform otherHandBone;
 
     [Tooltip("Player kitni door se lamp uthaa sakta hai (metres)")]
     public float pickupRange = 2.5f;        // Badhao to zyada dur se pickup ho
@@ -319,6 +351,18 @@ public class PlayerController : MonoBehaviour
 
         Vector3 inputDir = new Vector3(rawInput.x, 0f, rawInput.y).normalized;
         bool    hasInput = rawInput.sqrMagnitude > 0.01f;
+
+        // If a special action is playing, block all input so the player is completely locked
+        if (isSpecialActionPlaying)
+        {
+            hasInput = false;
+            isRunning = false;
+            isSlideHeld = false;
+            jumpPressed = false;
+            jumpHeld = false;
+            rawInput = Vector2.zero;
+            inputDir = Vector3.zero;
+        }
 
         // ─── 2. GROUNDED CHECK ──────────────────────────────────
         // Spherecast is more reliable than CharacterController.isGrounded
@@ -511,26 +555,20 @@ public class PlayerController : MonoBehaviour
                     RefillLamp(col.gameObject);
                     break;
                 }
-                else if (tryingToPickWeapon && col.CompareTag("specialobject1") && !hasSpecialObject1)
+                else if (tryingToPickWeapon)
                 {
-                    hasSpecialObject1 = true;
-                    col.gameObject.SetActive(false);
-                    Debug.Log("Collected specialobject1!");
-                    break;
-                }
-                else if (tryingToPickWeapon && col.CompareTag("specialobject2") && !hasSpecialObject2)
-                {
-                    hasSpecialObject2 = true;
-                    col.gameObject.SetActive(false);
-                    Debug.Log("Collected specialobject2!");
-                    break;
-                }
-                else if (tryingToPickWeapon && col.CompareTag("specialobject3") && !hasSpecialObject3)
-                {
-                    hasSpecialObject3 = true;
-                    col.gameObject.SetActive(false);
-                    Debug.Log("Collected specialobject3!");
-                    break;
+                    bool pickedUpSpecial = false;
+                    for (int i = 0; i < specialObjects.Length; i++)
+                    {
+                        if (specialObjects[i] != null && col.gameObject == specialObjects[i] && !hasSpecialObject[i])
+                        {
+                            hasSpecialObject[i] = true;
+                            StartCoroutine(AbsorbObject(specialObjects[i]));
+                            pickedUpSpecial = true;
+                            break;
+                        }
+                    }
+                    if (pickedUpSpecial) break;
                 }
             }
         }
@@ -552,38 +590,294 @@ public class PlayerController : MonoBehaviour
         // ─── 12. SPECIAL ACTION ─────────────────────────────────
         if (specialAction.triggered && groundedNow && !isSliding)
         {
-            if (hasSpecialObject1 && inTrigger1)
-                ExecuteSpecialAction(1);
-            else if (hasSpecialObject2 && inTrigger2)
-                ExecuteSpecialAction(2);
-            else if (hasSpecialObject3 && inTrigger3)
-                ExecuteSpecialAction(3);
+            for (int i = 0; i < 3; i++)
+            {
+                if (hasSpecialObject[i] && inPrayTrigger[i])
+                {
+                    // Player is automatically centered and rotated to the gate in OnTriggerEnter
+                    // So we can just directly execute the action.
+                    ExecuteSpecialAction(i);
+                    break;
+                }
+            }
         }
+    }
+
+    private System.Collections.IEnumerator AbsorbObject(GameObject obj)
+    {
+        Debug.Log("Absorbing Special Object!");
+
+        // Find the index of this object to store its light
+        int objIndex = -1;
+        for (int i = 0; i < specialObjects.Length; i++)
+        {
+            if (specialObjects[i] == obj) { objIndex = i; break; }
+        }
+
+        // ── Step 1: Stop AND Clear ALL Particle Systems (including inactive children) ──
+        // Check the object and its parent (in case the Particle System is a sibling inside a prefab)
+        ParticleSystem[] particles = obj.GetComponentsInChildren<ParticleSystem>(true);
+        foreach (ParticleSystem ps in particles)
+        {
+            // Sirf emit karna band karo taaki jo particles already hain wo dheere dheere fade ho jayein
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        }
+
+        if (obj.transform.parent != null)
+        {
+            ParticleSystem[] parentParticles = obj.transform.parent.GetComponentsInChildren<ParticleSystem>(true);
+            foreach (ParticleSystem ps in parentParticles)
+            {
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            }
+        }
+
+        // ── Step 2: Find Light and IMMEDIATELY TURN IT OFF (E press karte hi band ho jaye) ──
+        Light specialLight = null;
+        if (objIndex != -1)
+        {
+            specialLight = obj.GetComponentInChildren<Light>(true);
+            if (specialLight != null)
+            {
+                // Turant band kar do - object collect hote hi light off
+                specialLight.enabled = false;
+                specialLights[objIndex] = specialLight.transform;
+            }
+        }
+
+        // ── Step 3: Disable physics/colliders so it can fly smoothly ──
+        Collider col = obj.GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+        
+        Rigidbody rb = obj.GetComponent<Rigidbody>();
+        if (rb != null) rb.isKinematic = true;
+
+        // DO NOT SetParent yet! Fly in world space to avoid weird local scale/rotation issues
+        // ── Step 4: Fly to player's chest ──
+        Vector3 startScale = obj.transform.localScale;
+        Vector3 startPos   = obj.transform.position;
+        float time = 0f;
+
+        // Calculate dynamic chest position based on CharacterController to support ANY player scale
+        float worldHeight = controller.height * transform.lossyScale.y;
+        float worldRadius = controller.radius * transform.lossyScale.x;
+        float localChestY = controller.center.y + (controller.height * 0.25f);
+        float localChestZ = controller.radius * 1.5f;
+
+        while (time < absorbDuration)
+        {
+            time += Time.deltaTime;
+            float smoothT = Mathf.SmoothStep(0f, 1f, time / absorbDuration);
+
+            // Calculate chest position dynamically in world space every frame
+            Vector3 centerWorld = transform.position + transform.up * (controller.center.y * transform.lossyScale.y);
+            Vector3 chestPos = centerWorld + transform.up * (worldHeight * 0.25f) + transform.forward * worldRadius * 1.5f;
+            
+            obj.transform.position = Vector3.Lerp(startPos, chestPos, smoothT);
+            
+            // Shrink slowly but keep it visible (e.g. 10% size)
+            obj.transform.localScale = Vector3.Lerp(startScale, startScale * 0.1f, smoothT);
+
+            yield return null;
+        }
+
+        // Light PERMANENTLY OFF - bas transform reference player ke paas rahega PlaceObject ke liye
+        if (specialLight != null && specialLights[objIndex] != null)
+        {
+            // Sirf transform save karo, light band hi rahegi
+            specialLight.transform.SetParent(this.transform);
+            specialLight.transform.localPosition = new Vector3(0f, localChestY, localChestZ);
+            // Light band hi rahegi - player ke seene mein sirf invisible orb hai
+            specialLight.enabled = false;
+        }
+
+        obj.SetActive(false); // Main mesh hidden
     }
 
     private void ExecuteSpecialAction(int gateNumber)
     {
-        if (isAttacking) return; // Prevent spamming while already in an action/attack
+        if (isAttacking || isSpecialActionPlaying) return;
 
-        Debug.Log($"Special Action Triggered for Gate {gateNumber}!");
-        
-        // We use isAttacking flag to reuse the movement slow-down logic during the special animation
-        isAttacking = true; 
-        animator.SetTrigger("Special"); 
-        
-        // Use a default recovery time, adjust based on animation length
-        StartCoroutine(SpecialRecovery(2.5f, gateNumber)); 
+        Debug.Log($"Special Action Triggered for Gate {gateNumber + 1}!");
+
+        // Face player towards the gate automatically
+        if (gates[gateNumber] != null)
+        {
+            Vector3 dir = (gates[gateNumber].transform.position - transform.position);
+            dir.y = 0f;
+            if (dir != Vector3.zero)
+                transform.rotation = Quaternion.LookRotation(dir);
+        }
+
+        isSpecialActionPlaying = true; // Complete lock
+        isAttacking = true;
+        animator.SetTrigger("Special");
+
+        // Start the full sequence
+        StartCoroutine(SpecialActionSequence(gateNumber));
     }
 
-    private System.Collections.IEnumerator SpecialRecovery(float duration, int gateNumber)
+    private System.Collections.IEnumerator SpecialActionSequence(int gateNumber)
     {
-        yield return new WaitForSeconds(duration);
-        isAttacking = false;
+        // 1. Point Light flies out and gate opens (this handles the whole 5.5s sequence)
+        yield return StartCoroutine(PlaceObject(gateNumber));
 
-        // Optionally consume the object after animation finishes
-        if (gateNumber == 1) hasSpecialObject1 = false;
-        else if (gateNumber == 2) hasSpecialObject2 = false;
-        else if (gateNumber == 3) hasSpecialObject3 = false;
+        // 2. Sequence finished, unlock player
+        isAttacking = false;
+        isSpecialActionPlaying = false;
+        
+        // Consume the object state
+        hasSpecialObject[gateNumber] = false;
+        inPrayTrigger[gateNumber]    = false;
+    }
+
+    private System.Collections.IEnumerator PlaceObject(int index)
+    {
+        Transform lightTrans = specialLights[index];
+        if (lightTrans == null || placeTriggers[index] == null) yield break;
+
+        Light lt = lightTrans.GetComponent<Light>();
+
+        // ── Object ki Point Light ka color pehle save karo, phir band karo ──
+        Color objLightColor = lt != null ? lt.color : new Color(1f, 0.6f, 0.1f);
+        if (lt != null) lt.enabled = false;
+        lightTrans.SetParent(null);
+
+        // Target: Trigger ki exact position
+        Vector3 targetPos = placeTriggers[index].position;
+
+        // ═══════════════════════════════════════════════════════════
+        // LASER BEAMS — Object ke Point Light ke COLOUR ki
+        // Dheere dheere haath se trigger tak pahochti hai
+        // ═══════════════════════════════════════════════════════════
+        float worldUnit = controller.height * transform.lossyScale.y * 0.015f;
+
+        // Object ki exact light color se beam bana (2x bright core, soft outer glow)
+        Color coreColor = new Color(
+            Mathf.Min(objLightColor.r * 2.5f, 2f),
+            Mathf.Min(objLightColor.g * 2.5f, 2f),
+            Mathf.Min(objLightColor.b * 2.5f, 2f),
+            1f
+        );
+        Color glowColor = new Color(objLightColor.r, objLightColor.g, objLightColor.b, 0.45f);
+
+        Shader addShader = Shader.Find("Particles/Additive")
+                        ?? Shader.Find("Legacy Shaders/Particles/Additive")
+                        ?? Shader.Find("Sprites/Default");
+
+        float coreW = worldUnit * 4f;
+        float glowW = worldUnit * 12f;
+
+        // ── Left hand — Core ──
+        GameObject beam1Obj = new GameObject("LaserBeam1");
+        LineRenderer beam1Core = beam1Obj.AddComponent<LineRenderer>();
+        beam1Core.positionCount = 2;
+        beam1Core.startWidth = coreW; beam1Core.endWidth = coreW * 0.4f;
+        beam1Core.useWorldSpace = true;
+        beam1Core.material = new Material(addShader);
+        beam1Core.startColor = coreColor;
+        beam1Core.endColor = new Color(coreColor.r, coreColor.g, coreColor.b, 0.9f);
+        beam1Core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+        // ── Left hand — Glow ──
+        GameObject beam1GlowObj = new GameObject("LaserBeam1Glow");
+        LineRenderer beam1Glow = beam1GlowObj.AddComponent<LineRenderer>();
+        beam1Glow.positionCount = 2;
+        beam1Glow.startWidth = glowW; beam1Glow.endWidth = glowW * 0.2f;
+        beam1Glow.useWorldSpace = true;
+        beam1Glow.material = new Material(addShader);
+        beam1Glow.startColor = glowColor;
+        beam1Glow.endColor = new Color(glowColor.r, glowColor.g, glowColor.b, 0f);
+        beam1Glow.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+        // ── Right hand — Core ──
+        GameObject beam2Obj = new GameObject("LaserBeam2");
+        LineRenderer beam2Core = beam2Obj.AddComponent<LineRenderer>();
+        beam2Core.positionCount = 2;
+        beam2Core.startWidth = coreW; beam2Core.endWidth = coreW * 0.4f;
+        beam2Core.useWorldSpace = true;
+        beam2Core.material = new Material(addShader);
+        beam2Core.startColor = coreColor;
+        beam2Core.endColor = new Color(coreColor.r, coreColor.g, coreColor.b, 0.9f);
+        beam2Core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+        // ── Right hand — Glow ──
+        GameObject beam2GlowObj = new GameObject("LaserBeam2Glow");
+        LineRenderer beam2Glow = beam2GlowObj.AddComponent<LineRenderer>();
+        beam2Glow.positionCount = 2;
+        beam2Glow.startWidth = glowW; beam2Glow.endWidth = glowW * 0.2f;
+        beam2Glow.useWorldSpace = true;
+        beam2Glow.material = new Material(addShader);
+        beam2Glow.startColor = glowColor;
+        beam2Glow.endColor = new Color(glowColor.r, glowColor.g, glowColor.b, 0f);
+        beam2Glow.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+        float time = 0f;
+
+        while (time < lightFlyDuration)
+        {
+            time += Time.deltaTime;
+            // SmoothStep: beam dheere dheere badh ke trigger tak pahochti hai
+            float t = Mathf.SmoothStep(0f, 1f, time / lightFlyDuration);
+
+            // Pulsating glow — breathing energy effect
+            float pulse = 1f + 0.3f * Mathf.Sin(Time.time * 22f);
+            beam1Core.startWidth = coreW * pulse;
+            beam1Glow.startWidth = glowW * pulse;
+            beam2Core.startWidth = coreW * pulse;
+            beam2Glow.startWidth = glowW * pulse;
+
+            // Hand positions (animation se update hote hain)
+            Vector3 chestFallback = transform.position + transform.up * (controller.height * transform.lossyScale.y * 0.75f);
+            Vector3 handL = handBone      != null ? handBone.position      : (chestFallback - transform.right * (controller.radius * transform.lossyScale.x * 2f));
+            Vector3 handR = otherHandBone != null ? otherHandBone.position : (chestFallback + transform.right * (controller.radius * transform.lossyScale.x * 2f));
+
+            // Beam ka TIP dheere dheere haath se trigger ki taraf badhta hai
+            Vector3 beamTip = Vector3.Lerp(handL, targetPos, t); // Left beam tip
+            Vector3 beam2Tip = Vector3.Lerp(handR, targetPos, t); // Right beam tip
+
+            beam1Core.SetPosition(0, handL); beam1Core.SetPosition(1, beamTip);
+            beam1Glow.SetPosition(0, handL); beam1Glow.SetPosition(1, beamTip);
+            beam2Core.SetPosition(0, handR); beam2Core.SetPosition(1, beam2Tip);
+            beam2Glow.SetPosition(0, handR); beam2Glow.SetPosition(1, beam2Tip);
+
+            yield return null;
+        }
+
+        // Beam trigger pe pahochi — sab destroy
+        Destroy(beam1Obj);
+        Destroy(beam1GlowObj);
+        Destroy(beam2Obj);
+        Destroy(beam2GlowObj);
+
+        // ── Open the gate ──
+        if (gates[index] != null)
+        {
+            float slideDist = index == 0 ? gate1SlideDistance
+                            : index == 1 ? gate2SlideDistance
+                            : gate3SlideDistance;
+            yield return StartCoroutine(OpenGateSlideDown(gates[index], slideDist));
+            Debug.Log($"Gate {index + 1} Opened!");
+        }
+    }
+
+    private System.Collections.IEnumerator OpenGateSlideDown(GameObject gate, float slideDistance)
+    {
+        Vector3 startPos  = gate.transform.position;
+        Vector3 targetPos = startPos - new Vector3(0, slideDistance, 0);
+
+        float duration = 2.5f;
+        float time     = 0f;
+
+        while (time < duration)
+        {
+            time += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, time / duration);
+            gate.transform.position = Vector3.Lerp(startPos, targetPos, t);
+            yield return null;
+        }
+
+        gate.transform.position = targetPos;
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -869,16 +1163,66 @@ public class PlayerController : MonoBehaviour
     // ═══════════════════════════════════════════════════════════
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("GateTrigger1")) inTrigger1 = true;
-        else if (other.CompareTag("GateTrigger2")) inTrigger2 = true;
-        else if (other.CompareTag("GateTrigger3")) inTrigger3 = true;
+        for (int i = 0; i < prayTriggers.Length; i++)
+        {
+            if (prayTriggers[i] != null && other.transform == prayTriggers[i])
+            {
+                inPrayTrigger[i] = true;
+
+                // Auto-center and face the gate smoothly when entering
+                if (gates[i] != null)
+                {
+                    StartCoroutine(CenterAndFaceGate(prayTriggers[i].position, gates[i].transform.position));
+                }
+            }
+        }
+    }
+
+    private System.Collections.IEnumerator CenterAndFaceGate(Vector3 targetCenter, Vector3 gatePos)
+    {
+        // Block player input while centering so they don't fight the movement
+        isSpecialActionPlaying = true;
+
+        Vector3 startPos = transform.position;
+        Vector3 endPos = new Vector3(targetCenter.x, transform.position.y, targetCenter.z);
+
+        Quaternion startRot = transform.rotation;
+        Vector3 dir = (gatePos - endPos);
+        dir.y = 0f;
+        Quaternion endRot = dir != Vector3.zero ? Quaternion.LookRotation(dir) : transform.rotation;
+
+        float duration = 0.3f; // Smooth transition duration
+        float time = 0f;
+
+        while (time < duration)
+        {
+            time += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, time / duration);
+
+            // Use controller.Move instead of disabling the controller
+            // Disabling the controller causes OnTriggerExit to fire falsely!
+            Vector3 nextPos = Vector3.Lerp(startPos, endPos, t);
+            controller.Move(nextPos - transform.position);
+
+            transform.rotation = Quaternion.Slerp(startRot, endRot, t);
+            yield return null;
+        }
+
+        controller.Move(endPos - transform.position);
+        transform.rotation = endRot;
+        
+        isSpecialActionPlaying = false;
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag("GateTrigger1")) inTrigger1 = false;
-        else if (other.CompareTag("GateTrigger2")) inTrigger2 = false;
-        else if (other.CompareTag("GateTrigger3")) inTrigger3 = false;
+        for (int i = 0; i < prayTriggers.Length; i++)
+        {
+            if (prayTriggers[i] != null && other.transform == prayTriggers[i])
+            {
+                inPrayTrigger[i] = false;
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
