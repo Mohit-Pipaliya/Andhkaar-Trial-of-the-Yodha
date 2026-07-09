@@ -8,25 +8,34 @@ public class CameraController : MonoBehaviour
     public Vector3 targetOffset = new Vector3(0f, 1.5f, 0f);
 
     [Header("Distance Settings")]
-    public float defaultDistance = 5f;
+    public float defaultDistance = 9f;
+    [Tooltip("Camera distance during regular slide")]
+    public float slideDistance = 8f;
+    [Tooltip("Camera distance during tunnel/narrow passage slide (ducking)")]
+    public float tunneSlideDistance = 7f;
+    [Tooltip("Camera distance during gate special action (magic animation)")]
+    public float gateSpecialActionDistance = 15f;
     public float minDistance     = 1f;
     public float cameraCollisionRadius = 0.2f;
     public LayerMask collisionMask;
 
     [Header("Mouse Sensitivity")]
-    public float sensitivityX = 150f;
-    public float sensitivityY = 80f;
+    public float sensitivityX = 60f;    // Reduced for smooth look
+    public float sensitivityY = 40f;    // Reduced for smooth look
     public float minPitch = -20f;
     public float maxPitch = 60f;
 
     [Header("Follow Smoothing")]
-    public float verticalSmoothTime  = 0.2f;  
+    public float verticalSmoothTime  = 0.2f;
+    public float distanceSmoothTime = 0.15f;
 
     // Internal
     private float yaw = 0f;
     private float pitch = 10f;
     private float currentDistance;
     private float distanceVelocity;
+    private float pitchVelocity = 0f;
+    private float yawVelocity = 0f;
 
     private Vector3 posVelocity = Vector3.zero;
     private float   smoothedY;
@@ -59,22 +68,32 @@ public class CameraController : MonoBehaviour
         if (target == null) return;
 
         bool isSliding = playerController != null && playerController.IsSliding;
+        bool isSpecialAction = playerController != null && 
+                               (playerController.IsSpecialActionPlaying || playerController.IsAttacking);
 
         // ── 1. MOUSE Y INPUT (Pitch) ─────────
         Vector2 delta = lookAction.ReadValue<Vector2>();
-        // pitch -= delta.y * sensitivityY * Time.deltaTime; // Trackpad/Mouse se up/down band kiya
         pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
 
-        if (isSliding) 
-            pitch = Mathf.Lerp(pitch, 35f, Time.deltaTime * 8f); // Temple Run style: look down from top
+        // Dynamic pitch based on state
+        float targetPitch = 10f;
+        if (isSliding)
+            targetPitch = 35f; // Temple Run style: look down from top
+        else if (isSpecialAction)
+            targetPitch = 20f; // Slightly elevated to see player and gate/trigger
+
+        pitch = Mathf.SmoothDamp(pitch, targetPitch, ref pitchVelocity, 0.15f);
 
         // ── 2. CAMERA YAW (Mouse X) ─────────
-        yaw += delta.x * sensitivityX * Time.deltaTime;
+        float targetYaw = yaw + delta.x * sensitivityX * Time.deltaTime;
+        yaw = Mathf.SmoothDamp(yaw, targetYaw, ref yawVelocity, 0.1f);
 
-        // ── 3. PIVOT POINT (Absorb jump/run bounce) ─────────
-        float currentYOffset = isSliding ? (targetOffset.y - 1.2f) : targetOffset.y; // Camera low near the player
+        // ── 3. PIVOT POINT ─────────
+        float currentYOffset = isSliding ? (targetOffset.y - 1.2f) : targetOffset.y;
+        if (isSpecialAction)
+            currentYOffset = targetOffset.y + 0.5f; // Lift camera slightly for special action view
+            
         float rawY = target.position.y + currentYOffset;
-
         float currentVerticalSmooth = isSliding ? 0.1f : verticalSmoothTime;
         smoothedY = Mathf.SmoothDamp(smoothedY, rawY, ref smoothedYVelocity, currentVerticalSmooth);
 
@@ -84,20 +103,25 @@ public class CameraController : MonoBehaviour
             target.position.z + targetOffset.z
         );
 
-        // ── 4. DESIRED POSITION & COLLISION ─────────
-        Quaternion camRot = Quaternion.Euler(pitch, yaw, 0f);
-        Vector3 camDir = camRot * Vector3.back; 
+        // ── 4. DESIRED DISTANCE ─────────
+        float targetDist = defaultDistance;
+        if (isSliding)
+            targetDist = slideDistance;  // Regular slide or tunnel slide
+        else if (isSpecialAction)
+            targetDist = gateSpecialActionDistance;  // Gate magic animation
 
-        float targetDist = isSliding ? defaultDistance * 0.9f : defaultDistance; // Closer to player to show slide clearly
+        // ── 5. COLLISION CHECK ─────────
+        Quaternion camRot = Quaternion.Euler(pitch, yaw, 0f);
+        Vector3 camDir = camRot * Vector3.back;
+
         RaycastHit hit;
         if (Physics.SphereCast(pivot, cameraCollisionRadius, camDir, out hit, targetDist, collisionMask))
             targetDist = Mathf.Max(hit.distance - 0.1f, minDistance);
 
-        currentDistance = Mathf.SmoothDamp(currentDistance, targetDist, ref distanceVelocity, 0.1f);
+        currentDistance = Mathf.SmoothDamp(currentDistance, targetDist, ref distanceVelocity, distanceSmoothTime);
         Vector3 desiredPos = pivot + camDir * currentDistance;
 
-        // ── 5. APPLY DIRECTLY ─────────
-        // Horizontal smooth damp hatana zaroori hai nahi toh player screen par vibrate/shake karta hua dikhta hai
+        // ── 6. APPLY CAMERA TRANSFORM ─────────
         transform.position = desiredPos;
         transform.rotation = camRot;
     }

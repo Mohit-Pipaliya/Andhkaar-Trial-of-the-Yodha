@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
@@ -167,6 +168,16 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Player kitni door se lamp uthaa sakta hai (metres)")]
     public float pickupRange = 2.5f;        // Badhao to zyada dur se pickup ho
 
+    [Header("Environment Lighting")]
+    [Tooltip("Scene ka base ambient color")]
+    public Color ambientBaseColor = new Color(0.22f, 0.24f, 0.31f, 1f);
+    [Tooltip("Scene ka base ambient intensity")]
+    public float ambientBaseIntensity = 0.95f;
+    [Tooltip("Torch ke saath ambient kitna warm hoga")]
+    public float torchAmbientBoost = 0.18f;
+    [Tooltip("Special action ke dauran environment ko thoda brighter karne ka effect")]
+    public float specialAmbientBoost = 0.12f;
+
     private GameObject activeGroundLamp;    // Jo lamp pick kiya gaya hai (drop reference)
     private Coroutine lampDrainCoroutine;   // Coroutine reference for lamp point light intensity drain
     private GameObject activeGroundSword1;  // Drop reference for sword 1
@@ -178,6 +189,7 @@ public class PlayerController : MonoBehaviour
     private CharacterController controller;
     private Animator animator;
     private Transform mainCameraTransform;
+    private Light sceneDirectionalLight;
 
     private float originalHeight;
     private Vector3 originalCenter;
@@ -226,6 +238,8 @@ public class PlayerController : MonoBehaviour
 
     // ── Public property ─────────────────────────────────────────
     public bool IsSliding => isSliding;
+    public bool IsAttacking => isAttacking;
+    public bool IsSpecialActionPlaying => isSpecialActionPlaying;
 
     // ═══════════════════════════════════════════════════════════
     //  AWAKE — Setup Input
@@ -328,6 +342,9 @@ public class PlayerController : MonoBehaviour
         //   jumpVelocity = (2 * h) / t
         //   baseGravity  = -(2 * h) / t²
         RecalculateJumpPhysics();
+
+        FindSceneDirectionalLight();
+        ApplyEnvironmentLighting();
     }
 
     // Call this if you change jumpHeight or timeToApex at runtime
@@ -337,11 +354,54 @@ public class PlayerController : MonoBehaviour
         baseGravity  = -(2f * jumpHeight) / (timeToApex * timeToApex);
     }
 
+    private void FindSceneDirectionalLight()
+    {
+        if (sceneDirectionalLight != null) return;
+
+        Light[] allLights = FindObjectsOfType<Light>();
+        foreach (Light light in allLights)
+        {
+            if (light.type == LightType.Directional)
+            {
+                sceneDirectionalLight = light;
+                break;
+            }
+        }
+    }
+
+    private void ApplyEnvironmentLighting()
+    {
+        float ambientIntensity = ambientBaseIntensity;
+        Color ambientColor = ambientBaseColor;
+
+        if (hasTorch && handLampLight != null && handLampLight.isActiveAndEnabled && handLampLight.intensity > 0f)
+        {
+            ambientIntensity += torchAmbientBoost;
+            ambientColor = Color.Lerp(ambientColor, new Color(0.34f, 0.27f, 0.20f, 1f), 0.35f);
+        }
+
+        if (isSpecialActionPlaying || isAttacking)
+        {
+            ambientIntensity += specialAmbientBoost;
+        }
+
+        RenderSettings.ambientMode = AmbientMode.Flat;
+        RenderSettings.ambientLight = ambientColor * ambientIntensity;
+
+        if (sceneDirectionalLight != null)
+        {
+            sceneDirectionalLight.intensity = Mathf.Lerp(0.8f, 1.25f, ambientIntensity * 0.5f);
+            sceneDirectionalLight.color = Color.Lerp(new Color(0.75f, 0.78f, 0.9f, 1f), new Color(0.95f, 0.82f, 0.65f, 1f), hasTorch ? 0.2f : 0.08f);
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  UPDATE
     // ═══════════════════════════════════════════════════════════
     void Update()
     {
+        ApplyEnvironmentLighting();
+
         // ─── 1. READ INPUT ──────────────────────────────────────
         Vector2 rawInput     = moveAction.ReadValue<Vector2>();
         bool    isRunning    = runAction.ReadValue<float>()  > 0.1f;
@@ -752,38 +812,42 @@ public class PlayerController : MonoBehaviour
         // ═══════════════════════════════════════════════════════════
         float worldUnit = controller.height * transform.lossyScale.y * 0.015f;
 
-        // Object ki exact light color se beam bana (2x bright core, soft outer glow)
+        // Object ki exact light color se beam bana (thin hot core + soft outer halo)
         Color coreColor = new Color(
             Mathf.Min(objLightColor.r * 2.5f, 2f),
             Mathf.Min(objLightColor.g * 2.5f, 2f),
             Mathf.Min(objLightColor.b * 2.5f, 2f),
             1f
         );
-        Color glowColor = new Color(objLightColor.r, objLightColor.g, objLightColor.b, 0.45f);
+        Color glowColor = new Color(objLightColor.r, objLightColor.g, objLightColor.b, 0.35f);
 
         Shader addShader = Shader.Find("Particles/Additive")
                         ?? Shader.Find("Legacy Shaders/Particles/Additive")
                         ?? Shader.Find("Sprites/Default");
 
-        float coreW = worldUnit * 4f;
-        float glowW = worldUnit * 12f;
+        float coreW = worldUnit * 2.2f;
+        float glowW = worldUnit * 6.5f;
 
         // ── Left hand — Core ──
         GameObject beam1Obj = new GameObject("LaserBeam1");
         LineRenderer beam1Core = beam1Obj.AddComponent<LineRenderer>();
-        beam1Core.positionCount = 2;
-        beam1Core.startWidth = coreW; beam1Core.endWidth = coreW * 0.4f;
+        beam1Core.positionCount = 3;
+        beam1Core.numCornerVertices = 8;
+        beam1Core.numCapVertices = 8;
+        beam1Core.startWidth = coreW * 0.8f; beam1Core.endWidth = coreW * 0.2f;
         beam1Core.useWorldSpace = true;
         beam1Core.material = new Material(addShader);
         beam1Core.startColor = coreColor;
-        beam1Core.endColor = new Color(coreColor.r, coreColor.g, coreColor.b, 0.9f);
+        beam1Core.endColor = new Color(coreColor.r, coreColor.g, coreColor.b, 0.2f);
         beam1Core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
         // ── Left hand — Glow ──
         GameObject beam1GlowObj = new GameObject("LaserBeam1Glow");
         LineRenderer beam1Glow = beam1GlowObj.AddComponent<LineRenderer>();
-        beam1Glow.positionCount = 2;
-        beam1Glow.startWidth = glowW; beam1Glow.endWidth = glowW * 0.2f;
+        beam1Glow.positionCount = 3;
+        beam1Glow.numCornerVertices = 8;
+        beam1Glow.numCapVertices = 8;
+        beam1Glow.startWidth = glowW * 0.85f; beam1Glow.endWidth = glowW * 0.04f;
         beam1Glow.useWorldSpace = true;
         beam1Glow.material = new Material(addShader);
         beam1Glow.startColor = glowColor;
@@ -793,19 +857,23 @@ public class PlayerController : MonoBehaviour
         // ── Right hand — Core ──
         GameObject beam2Obj = new GameObject("LaserBeam2");
         LineRenderer beam2Core = beam2Obj.AddComponent<LineRenderer>();
-        beam2Core.positionCount = 2;
-        beam2Core.startWidth = coreW; beam2Core.endWidth = coreW * 0.4f;
+        beam2Core.positionCount = 3;
+        beam2Core.numCornerVertices = 8;
+        beam2Core.numCapVertices = 8;
+        beam2Core.startWidth = coreW * 0.8f; beam2Core.endWidth = coreW * 0.2f;
         beam2Core.useWorldSpace = true;
         beam2Core.material = new Material(addShader);
         beam2Core.startColor = coreColor;
-        beam2Core.endColor = new Color(coreColor.r, coreColor.g, coreColor.b, 0.9f);
+        beam2Core.endColor = new Color(coreColor.r, coreColor.g, coreColor.b, 0.2f);
         beam2Core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
         // ── Right hand — Glow ──
         GameObject beam2GlowObj = new GameObject("LaserBeam2Glow");
         LineRenderer beam2Glow = beam2GlowObj.AddComponent<LineRenderer>();
-        beam2Glow.positionCount = 2;
-        beam2Glow.startWidth = glowW; beam2Glow.endWidth = glowW * 0.2f;
+        beam2Glow.positionCount = 3;
+        beam2Glow.numCornerVertices = 8;
+        beam2Glow.numCapVertices = 8;
+        beam2Glow.startWidth = glowW * 0.85f; beam2Glow.endWidth = glowW * 0.04f;
         beam2Glow.useWorldSpace = true;
         beam2Glow.material = new Material(addShader);
         beam2Glow.startColor = glowColor;
@@ -820,8 +888,9 @@ public class PlayerController : MonoBehaviour
             // SmoothStep: beam dheere dheere badh ke trigger tak pahochti hai
             float t = Mathf.SmoothStep(0f, 1f, time / lightFlyDuration);
 
-            // Pulsating glow — breathing energy effect
-            float pulse = 1f + 0.3f * Mathf.Sin(Time.time * 22f);
+            // More natural energy pulse and slight beam drift
+            float pulse = 0.85f + 0.15f * Mathf.Sin(Time.time * 18f + 0.4f);
+            float sway = 0.08f * Mathf.Sin(Time.time * 14f + 0.2f);
             beam1Core.startWidth = coreW * pulse;
             beam1Glow.startWidth = glowW * pulse;
             beam2Core.startWidth = coreW * pulse;
@@ -833,13 +902,27 @@ public class PlayerController : MonoBehaviour
             Vector3 handR = otherHandBone != null ? otherHandBone.position : (chestFallback + transform.right * (controller.radius * transform.lossyScale.x * 2f));
 
             // Beam ka TIP dheere dheere haath se trigger ki taraf badhta hai
-            Vector3 beamTip = Vector3.Lerp(handL, targetPos, t); // Left beam tip
-            Vector3 beam2Tip = Vector3.Lerp(handR, targetPos, t); // Right beam tip
+            Vector3 beamTip = Vector3.Lerp(handL, targetPos, t);
+            Vector3 beam2Tip = Vector3.Lerp(handR, targetPos, t);
 
-            beam1Core.SetPosition(0, handL); beam1Core.SetPosition(1, beamTip);
-            beam1Glow.SetPosition(0, handL); beam1Glow.SetPosition(1, beamTip);
-            beam2Core.SetPosition(0, handR); beam2Core.SetPosition(1, beam2Tip);
-            beam2Glow.SetPosition(0, handR); beam2Glow.SetPosition(1, beam2Tip);
+            Vector3 beamDir = (beamTip - handL).normalized;
+            Vector3 beam2Dir = (beam2Tip - handR).normalized;
+            Vector3 swayOffset = transform.forward * sway;
+            Vector3 swayOffset2 = -transform.forward * sway;
+
+            beam1Core.SetPosition(0, handL);
+            beam1Core.SetPosition(1, beamTip + beamDir * 0.04f + swayOffset);
+            beam1Core.SetPosition(2, beamTip + beamDir * 0.12f + swayOffset * 0.6f);
+            beam1Glow.SetPosition(0, handL);
+            beam1Glow.SetPosition(1, beamTip + beamDir * 0.04f + swayOffset);
+            beam1Glow.SetPosition(2, beamTip + beamDir * 0.12f + swayOffset * 0.6f);
+
+            beam2Core.SetPosition(0, handR);
+            beam2Core.SetPosition(1, beam2Tip + beam2Dir * 0.04f + swayOffset2);
+            beam2Core.SetPosition(2, beam2Tip + beam2Dir * 0.12f + swayOffset2 * 0.6f);
+            beam2Glow.SetPosition(0, handR);
+            beam2Glow.SetPosition(1, beam2Tip + beam2Dir * 0.04f + swayOffset2);
+            beam2Glow.SetPosition(2, beam2Tip + beam2Dir * 0.12f + swayOffset2 * 0.6f);
 
             yield return null;
         }
