@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
 using TMPro;
+using System;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
@@ -179,6 +180,16 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Special action ke dauran environment ko thoda brighter karne ka effect")]
     public float specialAmbientBoost = 0.12f;
 
+    [Header("Player Health & Events")]
+    public float maxHealth = 100f;
+    private float currentHealth;
+    
+    // --- UI Events (Event-Driven Architecture) ---
+    public static event Action<float> OnHealthChanged;
+    public static event Action<float> OnOilChanged;
+    public static event Action<bool> OnTorchStateChanged; // Naya event add kiya
+    public static event Action OnPlayerDied;
+
     [Header("UI Prompts")]
     [Tooltip("Drag the GameObject/Image that shows 'Press O'")]
     public GameObject pressOUI;
@@ -318,14 +329,13 @@ public class PlayerController : MonoBehaviour
         if (animator == null) Debug.LogWarning("PlayerController: Animator is missing!");
         if (mainCameraTransform == null) Debug.LogWarning("PlayerController: Main Camera is missing!");
 
+        currentHealth = maxHealth; // Setup health
+
         if (animator != null)
             animator.applyRootMotion = false;
 
         // Safe skin width — prevents sliding on slopes
         controller.skinWidth = controller.radius * 0.1f;
-
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible   = false;
 
         originalHeight = controller.height;
         originalCenter = controller.center;
@@ -421,8 +431,8 @@ public class PlayerController : MonoBehaviour
         Vector3 inputDir = new Vector3(rawInput.x, 0f, rawInput.y).normalized;
         bool    hasInput = rawInput.sqrMagnitude > 0.01f;
 
-        // If a special action is playing, block all input so the player is completely locked
-        if (isSpecialActionPlaying)
+        // If a special action is playing OR game is not active (paused/loading), block all input
+        if (isSpecialActionPlaying || !UIManager.isGameActive)
         {
             hasInput = false;
             isRunning = false;
@@ -975,6 +985,28 @@ public class PlayerController : MonoBehaviour
     }
 
     // ═══════════════════════════════════════════════════════════
+    //  HEALTH SYSTEM
+    // ═══════════════════════════════════════════════════════════
+    public void TakeDamage(float damageAmount)
+    {
+        if (currentHealth <= 0) return; // Already dead
+
+        currentHealth -= damageAmount;
+        if (currentHealth < 0) currentHealth = 0;
+
+        // Fire event to notify UI smoothly
+        OnHealthChanged?.Invoke(currentHealth);
+
+        if (currentHealth <= 0)
+        {
+            OnPlayerDied?.Invoke();
+            // Yahan player marne ka animation ya ragdoll laga sakte ho
+            animator.SetTrigger("Die"); // Agar marne ka animation hai toh
+            this.enabled = false; // Disable controller
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
     //  TORCH METHODS  (Dual-Object System)
     // ═══════════════════════════════════════════════════════════
     private void EquipTorch(GameObject groundLamp)
@@ -997,6 +1029,9 @@ public class PlayerController : MonoBehaviour
             handLampLight.intensity = maxLampIntensity;
             lampDrainCoroutine = StartCoroutine(DrainLampOil());
         }
+
+        // 4. UI ko batao ki torch utha li hai
+        OnTorchStateChanged?.Invoke(true);
     }
 
     private System.Collections.IEnumerator DrainLampOil()
@@ -1008,6 +1043,9 @@ public class PlayerController : MonoBehaviour
             
             if (handLampLight.intensity < 0)
                 handLampLight.intensity = 0;
+                
+            // Fire event so UI slider moves smoothly with intensity
+            OnOilChanged?.Invoke(handLampLight.intensity);
                 
             yield return null; // Next frame tak wait karo
         }
@@ -1022,6 +1060,9 @@ public class PlayerController : MonoBehaviour
         {
             handLampLight.enabled = true; // Make sure it's on
             handLampLight.intensity = maxLampIntensity;
+            
+            // Fire event instantly
+            OnOilChanged?.Invoke(maxLampIntensity);
             
             // Restart drain process if stopped
             if (lampDrainCoroutine != null)
@@ -1067,6 +1108,9 @@ public class PlayerController : MonoBehaviour
         }
 
         activeGroundLamp = null;
+        
+        // UI ko batao ki torch chhod di hai
+        OnTorchStateChanged?.Invoke(false);
     }
 
     // ═══════════════════════════════════════════════════════════
