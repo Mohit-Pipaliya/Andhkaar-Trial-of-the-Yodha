@@ -91,6 +91,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 653ef715b4a8845109887512d05bf219, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8356049746356183195}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 653ef715b4a8845109887512d05bf219, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3378138201912329920}
   m_SourcePrefab: {fileID: 100100000, guid: 653ef715b4a8845109887512d05bf219, type: 3}
 --- !u!1 &2476785098520675071 stripped
 GameObject:
@@ -118,3 +121,19 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.20252977, y: 0.16663752, z: 0.14324354}
   m_Center: {x: 0.0021051406, y: -0.0013520002, z: -0.010473501}
+--- !u!114 &3378138201912329920
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2476785098520675071}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 18d5824a0fff742809cc4b3f0d79db0a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PickupItem
+  playerTag: Player
+  pickupKey: 101
+  pressE_UI: {fileID: 0}
+  pressO_UI: {fileID: 0}

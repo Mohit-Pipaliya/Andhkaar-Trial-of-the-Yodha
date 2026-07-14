@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
+using TMPro;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
@@ -177,6 +178,14 @@ public class PlayerController : MonoBehaviour
     public float torchAmbientBoost = 0.18f;
     [Tooltip("Special action ke dauran environment ko thoda brighter karne ka effect")]
     public float specialAmbientBoost = 0.12f;
+
+    [Header("UI Prompts")]
+    [Tooltip("Drag the GameObject/Image that shows 'Press O'")]
+    public GameObject pressOUI;
+    [Tooltip("Drag the GameObject/Image that shows 'Press E'")]
+    public GameObject pressEUI;
+    [Tooltip("Drag the GameObject/Image that shows 'Press M' (Optional)")]
+    public GameObject pressMUI;
 
     private GameObject activeGroundLamp;    // Jo lamp pick kiya gaya hai (drop reference)
     private Coroutine lampDrainCoroutine;   // Coroutine reference for lamp point light intensity drain
@@ -661,6 +670,8 @@ public class PlayerController : MonoBehaviour
                 }
             }
         }
+
+        UpdateInteractUI(groundedNow);
     }
 
     private System.Collections.IEnumerator AbsorbObject(GameObject obj)
@@ -1306,6 +1317,74 @@ public class PlayerController : MonoBehaviour
                 inPrayTrigger[i] = false;
             }
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  UI
+    // ═══════════════════════════════════════════════════════════
+    private void UpdateInteractUI(bool groundedNow)
+    {
+        bool showO = false;
+        bool showE = false;
+        bool showM = false;
+
+        if (groundedNow && !isSliding)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                if (hasSpecialObject[i] && inPrayTrigger[i])
+                {
+                    showM = true;
+                    break;
+                }
+            }
+        }
+
+        if (!showM)
+        {
+            Collider[] nearby = Physics.OverlapSphere(transform.position, pickupRange);
+            foreach (Collider col in nearby)
+            {
+                if (col.CompareTag("OilLamp") && !hasTorch)
+                {
+                    showO = true;
+                    break;
+                }
+                else if (col.CompareTag("Sword 1") && !hasSword1)
+                {
+                    showE = true;
+                    break;
+                }
+                else if (col.CompareTag("Sword 2") && !hasSword2)
+                {
+                    showE = true;
+                    break;
+                }
+                else if (col.CompareTag("OilCan") && hasTorch)
+                {
+                    showE = true;
+                    break;
+                }
+                else
+                {
+                    bool specialFound = false;
+                    for (int i = 0; i < specialObjects.Length; i++)
+                    {
+                        if (specialObjects[i] != null && col.gameObject == specialObjects[i] && !hasSpecialObject[i])
+                        {
+                            showE = true;
+                            specialFound = true;
+                            break;
+                        }
+                    }
+                    if (specialFound) break;
+                }
+            }
+        }
+
+        if (pressOUI != null) pressOUI.SetActive(showO);
+        if (pressEUI != null) pressEUI.SetActive(showE);
+        if (pressMUI != null) pressMUI.SetActive(showM);
     }
 
     // ═══════════════════════════════════════════════════════════
