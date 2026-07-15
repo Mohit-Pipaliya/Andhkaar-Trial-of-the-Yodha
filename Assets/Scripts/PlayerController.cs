@@ -89,6 +89,7 @@ public class PlayerController : MonoBehaviour
     [Range(0.1f, 1f)]
     public float slideHeightMultiplier = 0.5f;
     private bool isSliding = false;
+    private bool isCrouchWalking = false; // Crouch karte hue movement
 
     // ═══════════════════════════════════════════════════════════
     //  QUEST & SPECIAL ABILITIES
@@ -156,8 +157,8 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Hand Lamp ke andar jo Point Light hai, use yahan drag karein")]
     public Light handLampLight;
 
-    [Tooltip("Kitni tezi se oil kam hoga (Bada number = jaldi khatam).")]
-    public float lampDrainRate = 2f; // 100 intensity / 2 = 50 seconds mein khatam (dheere dheere)
+    [Tooltip("Kitni tezi se oil kam hoga (Bada number = jaldi khatam). 0.1 = ~1000 seconds mein khatam.")]
+    public float lampDrainRate = 0.1f; // 100 intensity / 0.1 = ~1000 seconds (~16 min)
     [Tooltip("Light ki starting intensity.")]
     public float maxLampIntensity = 100f;
 
@@ -168,7 +169,7 @@ public class PlayerController : MonoBehaviour
     public Transform otherHandBone;
 
     [Tooltip("Player kitni door se lamp uthaa sakta hai (metres)")]
-    public float pickupRange = 2.5f;        // Badhao to zyada dur se pickup ho
+    public float pickupRange = 5.0f;        // Badhao to zyada dur se pickup ho
 
     [Header("Environment Lighting")]
     [Tooltip("Scene ka base ambient color")]
@@ -197,6 +198,8 @@ public class PlayerController : MonoBehaviour
     public GameObject pressEUI;
     [Tooltip("Drag the GameObject/Image that shows 'Press M' (Optional)")]
     public GameObject pressMUI;
+    [Tooltip("Drag the GameObject/Image that shows 'Press 1 to Put Your Sword'")]
+    public GameObject pressPut1UI;
 
     private GameObject activeGroundLamp;    // Jo lamp pick kiya gaya hai (drop reference)
     private Coroutine lampDrainCoroutine;   // Coroutine reference for lamp point light intensity drain
@@ -260,6 +263,29 @@ public class PlayerController : MonoBehaviour
     public bool IsSliding => isSliding;
     public bool IsAttacking => isAttacking;
     public bool IsSpecialActionPlaying => isSpecialActionPlaying;
+    public bool IsCrouchWalking => isCrouchWalking; // Camera zoom-out ke liye
+    // Torch Idle: torch hai + koi movement nahi + grounded + attack nahi
+    public bool IsTorchIdle => hasTorch && !isCrouchWalking && !isAttacking && !isSpecialActionPlaying;
+    // Pray trigger me hai?
+    public bool IsInPrayTrigger
+    {
+        get {
+            for (int i = 0; i < inPrayTrigger.Length; i++)
+                if (inPrayTrigger[i]) return true;
+            return false;
+        }
+    }
+
+    // Magic animation ke dauran active gate ki world position
+    public Vector3 ActiveGatePosition
+    {
+        get {
+            for (int i = 0; i < inPrayTrigger.Length; i++)
+                if (inPrayTrigger[i] && gates[i] != null)
+                    return gates[i].transform.position;
+            return transform.position;
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════
     //  AWAKE — Setup Input
@@ -296,6 +322,12 @@ public class PlayerController : MonoBehaviour
         equipNoneAction   = new InputAction("EquipNone",   type: InputActionType.Button, binding: "<Keyboard>/1");
         equipSword1Action = new InputAction("EquipSword1", type: InputActionType.Button, binding: "<Keyboard>/2");
         equipSword2Action = new InputAction("EquipSword2", type: InputActionType.Button, binding: "<Keyboard>/3");
+
+        // UI Prompts — Awake mein hi hide karo (Start se pehle) taaki ek bhi frame na dikhe
+        if (pressPut1UI != null) pressPut1UI.SetActive(false);
+        if (pressMUI != null)    pressMUI.SetActive(false);
+        if (pressOUI != null)    pressOUI.SetActive(false);
+        if (pressEUI != null)    pressEUI.SetActive(false);
     }
 
     void OnEnable()
@@ -321,6 +353,18 @@ public class PlayerController : MonoBehaviour
     // ═══════════════════════════════════════════════════════════
     void Start()
     {
+        // --- SETUP VALIDATION (Helps find missing Inspector settings) ---
+        if (pressOUI == null) Debug.LogError("SETUP ERROR: 'Press O UI' is not assigned in PlayerController!");
+        if (pressEUI == null) Debug.LogError("SETUP ERROR: 'Press E UI' is not assigned in PlayerController!");
+        
+        GameObject lamp = GameObject.FindWithTag("OilLamp");
+        if (lamp == null) Debug.LogWarning("SETUP WARNING: No object found with tag 'OilLamp'. Did you forget to set the tag on the lamp?");
+        else if (lamp.GetComponent<Collider>() == null) Debug.LogWarning("SETUP WARNING: The object tagged 'OilLamp' does not have a Collider! Player won't detect it.");
+
+        GameObject sword = GameObject.FindWithTag("Sword 1");
+        if (sword == null) Debug.LogWarning("SETUP WARNING: No object found with tag 'Sword 1'. Did you forget to set the tag?");
+        // ----------------------------------------------------------------
+
         controller           = GetComponent<CharacterController>();
         animator             = GetComponentInChildren<Animator>();
         mainCameraTransform  = Camera.main.transform;
@@ -355,6 +399,12 @@ public class PlayerController : MonoBehaviour
             handSword2Object.SetActive(false);
             
         UpdateWeaponState(WeaponType.None);
+
+        // ── UI Prompts shuru mein hide karo ──
+        if (pressOUI != null)    pressOUI.SetActive(false);
+        if (pressEUI != null)    pressEUI.SetActive(false);
+        if (pressMUI != null)    pressMUI.SetActive(false);
+        if (pressPut1UI != null) pressPut1UI.SetActive(false); // IMPORTANT: shuru mein chhupa ke rakho
 
         // ── Derive physics values from designer-friendly inputs ──
         // Using kinematic equations:
@@ -503,11 +553,18 @@ public class PlayerController : MonoBehaviour
             if (canStand)
             {
                 isSliding             = false;
+                isCrouchWalking       = false;
                 controller.height     = originalHeight;
                 controller.center     = originalCenter;
                 animator.SetBool("IsSliding", false);
             }
         }
+
+        // Crouch+walk: jab slide chal raha ho aur player move kar raha ho
+        if (isSliding)
+            isCrouchWalking = hasInput;
+        else
+            isCrouchWalking = false;
 
         // ─── 5. ATTACK ──────────────────────────────────────────
         HandleAttack(groundedNow);
@@ -666,23 +723,64 @@ public class PlayerController : MonoBehaviour
         if (equipSword2Action.triggered && hasSword2)
             UpdateWeaponState(WeaponType.Sword2);
 
-        // ─── 12. SPECIAL ACTION ─────────────────────────────────
+        // ─── 12. SPECIAL ACTION (3-step sword-put flow) ─────────────────────────
         if (specialAction.triggered && groundedNow && !isSliding)
         {
-            for (int i = 0; i < 3; i++)
+            // Step 3 — pressMUI wapas dikha hua hai, M dabane ka intezaar (sword rakh diya)
+            if (waitingForMagicM)
             {
-                if (hasSpecialObject[i] && inPrayTrigger[i])
+                // M dabaya → magic animation fire karo!
+                waitingForMagicM = false;
+                if (pressMUI != null) pressMUI.SetActive(false);
+                ExecuteSpecialAction(pendingSpecialIndex);
+            }
+            else
+            {
+                // Normal check — pray trigger zone mein hai?
+                for (int i = 0; i < 3; i++)
                 {
-                    // Player is automatically centered and rotated to the gate in OnTriggerEnter
-                    // So we can just directly execute the action.
-                    ExecuteSpecialAction(i);
-                    break;
+                    if (hasSpecialObject[i] && inPrayTrigger[i])
+                    {
+                        if (currentWeapon != WeaponType.None)
+                        {
+                            // Sword haath mein hai:
+                            // Step 1 — M dabaya → pressMUI band karo, pressPut1UI dikhao
+                            pendingSpecialIndex = i;
+                            waitingForSwordPut  = true;
+                            if (pressMUI != null)    pressMUI.SetActive(false);
+                            if (pressPut1UI != null) pressPut1UI.SetActive(true);
+                        }
+                        else
+                        {
+                            // Koi sword nahi — seedha magic
+                            ExecuteSpecialAction(i);
+                        }
+                        break;
+                    }
                 }
             }
         }
 
+        // Step 2 — pressPut1UI dikha hua hai, "1" dabane ka intezaar
+        if (waitingForSwordPut && equipNoneAction.triggered)
+        {
+            UpdateWeaponState(WeaponType.None);   // Sword haath se hatao
+            waitingForSwordPut = false;
+            waitingForMagicM   = true;            // Ab M dabane ka wait karo
+
+            // pressPut1UI band karo, pressMUI wapas dikhao — player M dabayega magic ke liye
+            if (pressPut1UI != null) pressPut1UI.SetActive(false);
+            if (pressMUI != null)    pressMUI.SetActive(true);
+        }
+
         UpdateInteractUI(groundedNow);
     }
+
+    // ─── Helpers for sword-put flow ──────────────────────────────────────────
+    private bool waitingForSwordPut = false;
+    private bool waitingForMagicM   = false;  // 1 dabane ke baad M press ka intezaar
+    private int  pendingSpecialIndex = -1;
+
 
     private System.Collections.IEnumerator AbsorbObject(GameObject obj)
     {
@@ -772,6 +870,16 @@ public class PlayerController : MonoBehaviour
             specialLight.enabled = false;
         }
 
+        // Fog ko dissipate karo — pehle detach karo taaki obj.SetActive(false) se band na ho
+        SpecialObjectFog[] fogScripts = obj.GetComponentsInChildren<SpecialObjectFog>(true);
+        if (fogScripts.Length == 0 && obj.transform.parent != null)
+            fogScripts = obj.transform.parent.GetComponentsInChildren<SpecialObjectFog>(true);
+        foreach (var fog in fogScripts)
+        {
+            fog.transform.SetParent(null); // Scene root me move karo (parent se alag)
+            fog.OnObjectCollected();       // Fade-out + self-destroy trigger karo
+        }
+
         obj.SetActive(false); // Main mesh hidden
     }
 
@@ -846,8 +954,9 @@ public class PlayerController : MonoBehaviour
                         ?? Shader.Find("Legacy Shaders/Particles/Additive")
                         ?? Shader.Find("Sprites/Default");
 
-        float coreW = worldUnit * 2.2f;
-        float glowW = worldUnit * 6.5f;
+        // ── BEAM THICKNESS (Ab jyada moti aur powerful hai) ──
+        float coreW = worldUnit * 4.5f;   // Pehle 2.2 tha
+        float glowW = worldUnit * 13.0f;  // Pehle 6.5 tha
 
         // ── Left hand — Core ──
         GameObject beam1Obj = new GameObject("LaserBeam1");
@@ -861,6 +970,9 @@ public class PlayerController : MonoBehaviour
         beam1Core.startColor = coreColor;
         beam1Core.endColor = new Color(coreColor.r, coreColor.g, coreColor.b, 0.2f);
         beam1Core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        
+        // Add Audio
+        beam1Obj.AddComponent<ProceduralLaserAudio>();
 
         // ── Left hand — Glow ──
         GameObject beam1GlowObj = new GameObject("LaserBeam1Glow");
@@ -888,6 +1000,9 @@ public class PlayerController : MonoBehaviour
         beam2Core.endColor = new Color(coreColor.r, coreColor.g, coreColor.b, 0.2f);
         beam2Core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
+        // Add Audio
+        beam2Obj.AddComponent<ProceduralLaserAudio>();
+
         // ── Right hand — Glow ──
         GameObject beam2GlowObj = new GameObject("LaserBeam2Glow");
         LineRenderer beam2Glow = beam2GlowObj.AddComponent<LineRenderer>();
@@ -909,9 +1024,9 @@ public class PlayerController : MonoBehaviour
             // SmoothStep: beam dheere dheere badh ke trigger tak pahochti hai
             float t = Mathf.SmoothStep(0f, 1f, time / lightFlyDuration);
 
-            // More natural energy pulse and slight beam drift
-            float pulse = 0.85f + 0.15f * Mathf.Sin(Time.time * 18f + 0.4f);
-            float sway = 0.08f * Mathf.Sin(Time.time * 14f + 0.2f);
+            // More natural energy pulse and slight beam drift (Realistic Flutter)
+            float pulse = 0.7f + 0.3f * Mathf.Sin(Time.time * 25f + 0.4f); // Faster, more aggressive pulse
+            float sway = 0.15f * Mathf.Sin(Time.time * 18f + 0.2f); // Thoda zyada sway
             beam1Core.startWidth = coreW * pulse;
             beam1Glow.startWidth = glowW * pulse;
             beam2Core.startWidth = coreW * pulse;
@@ -1034,19 +1149,24 @@ public class PlayerController : MonoBehaviour
         OnTorchStateChanged?.Invoke(true);
     }
 
+    private bool isLampFrozen = false; // Pray trigger me lamp drain freeze
+
     private System.Collections.IEnumerator DrainLampOil()
     {
         while (hasTorch && handLampLight != null && handLampLight.intensity > 0)
         {
-            // Time.deltaTime se update har frame pe thoda-thoda subtract hoga (realistic feel)
-            handLampLight.intensity -= lampDrainRate * Time.deltaTime;
-            
-            if (handLampLight.intensity < 0)
-                handLampLight.intensity = 0;
-                
-            // Fire event so UI slider moves smoothly with intensity
+            // Pray trigger zone mein hain? Drain freeze karo
+            if (!isLampFrozen)
+            {
+                handLampLight.intensity -= lampDrainRate * Time.deltaTime;
+
+                if (handLampLight.intensity < 0)
+                    handLampLight.intensity = 0;
+            }
+
+            // UI slider update (frozen ya nahi, slider current value dikhaye)
             OnOilChanged?.Invoke(handLampLight.intensity);
-                
+
             yield return null; // Next frame tak wait karo
         }
     }
@@ -1306,6 +1426,7 @@ public class PlayerController : MonoBehaviour
             if (prayTriggers[i] != null && other.transform == prayTriggers[i])
             {
                 inPrayTrigger[i] = true;
+                isLampFrozen = true;  // 🔒 Lamp drain freeze — pray trigger mein hai
 
                 // Auto-center and face the gate smoothly when entering
                 if (gates[i] != null)
@@ -1359,6 +1480,14 @@ public class PlayerController : MonoBehaviour
             if (prayTriggers[i] != null && other.transform == prayTriggers[i])
             {
                 inPrayTrigger[i] = false;
+
+                // Check karo koi aur trigger active hai? Agar nahi, tab unfreeze karo
+                bool anyTriggerActive = false;
+                for (int j = 0; j < inPrayTrigger.Length; j++)
+                    if (inPrayTrigger[j]) { anyTriggerActive = true; break; }
+
+                if (!anyTriggerActive)
+                    isLampFrozen = false; // 🔓 Bahar aaya — drain wapas chalu
             }
         }
     }
@@ -1391,6 +1520,7 @@ public class PlayerController : MonoBehaviour
             {
                 if (col.CompareTag("OilLamp") && !hasTorch)
                 {
+                    Debug.Log("SUCCESS: OilLamp detected in range! Setting showO = true");
                     showO = true;
                     break;
                 }
@@ -1428,7 +1558,10 @@ public class PlayerController : MonoBehaviour
 
         if (pressOUI != null) pressOUI.SetActive(showO);
         if (pressEUI != null) pressEUI.SetActive(showE);
-        if (pressMUI != null) pressMUI.SetActive(showM);
+        // pressMUI: normal zone mein dikhe, ya jab sword rakh ke M press ka wait ho
+        if (pressMUI != null)    pressMUI.SetActive((showM && !waitingForSwordPut) || waitingForMagicM);
+        // pressPut1UI: sirf sword-put wait mode mein dikhao, baaki time band
+        if (pressPut1UI != null) pressPut1UI.SetActive(waitingForSwordPut);
     }
 
     // ═══════════════════════════════════════════════════════════

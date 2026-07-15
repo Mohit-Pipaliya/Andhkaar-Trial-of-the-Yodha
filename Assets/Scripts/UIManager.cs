@@ -47,18 +47,9 @@ public class UIManager : MonoBehaviour
     // ================= EVENT SUBSCRIPTION =================
     private void Awake()
     {
-        // Auto-fix EventSystem for the New Input System so buttons work!
-        UnityEngine.EventSystems.EventSystem es = FindObjectOfType<UnityEngine.EventSystems.EventSystem>();
-        if (es != null)
-        {
-            if (es.GetComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>() == null)
-            {
-                var oldModule = es.GetComponent<UnityEngine.EventSystems.BaseInputModule>();
-                if (oldModule != null) Destroy(oldModule);
-                es.gameObject.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
-                Debug.Log("UIManager: Automatically updated EventSystem for the New Input System!");
-            }
-        }
+        // Auto-fix EventSystem code removed because adding InputSystemUIInputModule 
+        // at runtime without an actions asset breaks UI buttons.
+        // User must click "Replace with InputSystemUIInputModule" on the EventSystem in the Unity Editor.
     }
 
     private void OnEnable()
@@ -146,6 +137,7 @@ public class UIManager : MonoBehaviour
     {
         if (panel == null) return;
         panel.SetActive(true);
+        panel.transform.SetAsLastSibling(); // Bring panel to the front to prevent Raycast blocking
         
         if (animate)
         {
@@ -229,11 +221,17 @@ public class UIManager : MonoBehaviour
 
     public void QuitGame()
     {
+        Debug.Log("QuitGame called!");
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
         Application.Quit(); 
+#endif
     }
 
     public void BackToMainMenu()
     {
+        Debug.Log("BackToMainMenu called!");
         isGamePaused = false;
         Time.timeScale = 1f; 
         isGameActive = false; // Lock player input
@@ -247,6 +245,7 @@ public class UIManager : MonoBehaviour
     // ================= 3. Pause & Options Menu =================
     public void PauseGame()
     {
+        Debug.Log("PauseGame called!");
         isGamePaused = true;
         isGameActive = false; // Lock player input
         Time.timeScale = 0f; // Game freeze
@@ -260,6 +259,7 @@ public class UIManager : MonoBehaviour
 
     public void ResumeGame()
     {
+        Debug.Log("ResumeGame called!");
         isGamePaused = false;
         isGameActive = true; // Unlock player
         Time.timeScale = 1f; 
@@ -271,16 +271,36 @@ public class UIManager : MonoBehaviour
         Cursor.visible = false;
     }
 
+    private bool openedOptionsFromMainMenu = false;
+
     public void OpenOptionsMenu()
     {
-        HidePanel(pauseMenuPanel, true);
+        if (mainMenuPanel != null && mainMenuPanel.activeSelf)
+        {
+            openedOptionsFromMainMenu = true;
+            HidePanel(mainMenuPanel, true);
+        }
+        else if (pauseMenuPanel != null && pauseMenuPanel.activeSelf)
+        {
+            openedOptionsFromMainMenu = false;
+            HidePanel(pauseMenuPanel, true);
+        }
+        
         ShowPanel(optionsMenuPanel, true);
     }
 
     public void CloseOptionsMenu()
     {
         HidePanel(optionsMenuPanel, true);
-        ShowPanel(pauseMenuPanel, true);
+        
+        if (openedOptionsFromMainMenu)
+        {
+            ShowPanel(mainMenuPanel, true);
+        }
+        else
+        {
+            ShowPanel(pauseMenuPanel, true);
+        }
     }
 
     public void SetVolume(float volume)
@@ -354,14 +374,19 @@ public class UIManager : MonoBehaviour
         else if (completedLevel == 3)
         {
             ShowNotification("Level 3 Completed");
-            StartCoroutine(ShowFinalBossNotificationDelay());
+            StartCoroutine(ShowFinalBossNotificationDelay("Final Boss Fight"));
         }
     }
 
-    private IEnumerator ShowFinalBossNotificationDelay()
+    public void TriggerFinalBossSequence(string bossText)
+    {
+        StartCoroutine(ShowFinalBossNotificationDelay(bossText));
+    }
+
+    private IEnumerator ShowFinalBossNotificationDelay(string bossText)
     {
         yield return new WaitForSeconds(notificationShowTime + 0.5f);
-        ShowNotification("Final Boss Fight");
+        ShowNotification(bossText);
     }
 
     public void ShowNotification(string message)
