@@ -181,6 +181,9 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Special action ke dauran environment ko thoda brighter karne ka effect")]
     public float specialAmbientBoost = 0.12f;
 
+    [Header("Audio")]
+    public AudioSource playerAudio;
+
     [Header("Player Health & Events")]
     public float maxHealth = 100f;
     private float currentHealth;
@@ -427,7 +430,7 @@ public class PlayerController : MonoBehaviour
     {
         if (sceneDirectionalLight != null) return;
 
-        Light[] allLights = FindObjectsOfType<Light>();
+        Light[] allLights = FindObjectsByType<Light>(FindObjectsSortMode.None);
         foreach (Light light in allLights)
         {
             if (light.type == LightType.Directional)
@@ -482,7 +485,7 @@ public class PlayerController : MonoBehaviour
         bool    hasInput = rawInput.sqrMagnitude > 0.01f;
 
         // If a special action is playing OR game is not active (paused/loading), block all input
-        if (isSpecialActionPlaying || !UIManager.isGameActive)
+        if (isSpecialActionPlaying || isFrozen || !UIManager.isGameActive)
         {
             hasInput = false;
             isRunning = false;
@@ -612,10 +615,13 @@ public class PlayerController : MonoBehaviour
             targetHorizontal = moveDir * currentSpeed;
         }
 
-        // Air control: blend between current momentum and desired direction
+        // Air & Ground control: blend between current momentum and desired direction
         if (groundedNow)
         {
-            horizontalVelocity = targetHorizontal;
+            // Instant movement ki jagah smooth acceleration aur deceleration lagaya hai 
+            // taaki animation robotic na lage aur foot sliding kam ho.
+            float groundAccel = hasInput ? 10f : 15f; 
+            horizontalVelocity = Vector3.Lerp(horizontalVelocity, targetHorizontal, Time.deltaTime * groundAccel);
         }
         else
         {
@@ -657,8 +663,17 @@ public class PlayerController : MonoBehaviour
         controller.Move(new Vector3(0f, verticalVelocity, 0f) * Time.deltaTime);
 
         // ─── 9. ANIMATIONS ──────────────────────────────────────
-        animator.SetBool("IsWalking", hasInput && !isRunning && groundedNow && !isSliding);
-        animator.SetBool("IsRunning",  hasInput &&  isRunning && groundedNow && !isSliding);
+        // Animation ko direct input se na chalake, actual speed se chalayenge
+        // Isse jab player rukega toh moonwalking (sliding) nahi hogi.
+        float currentHorizSpeed = new Vector3(horizontalVelocity.x, 0f, horizontalVelocity.z).magnitude;
+        bool isMovingAnim = currentHorizSpeed > 0.3f && groundedNow && !isSliding;
+        
+        // Agar run button daba rakha hai ya speed walk speed se thodi zyada hai toh run karega
+        bool isRunningAnim = isMovingAnim && (isRunning || currentHorizSpeed > walkSpeed + 0.5f);
+        bool isWalkingAnim = isMovingAnim && !isRunningAnim;
+
+        animator.SetBool("IsWalking", isWalkingAnim);
+        animator.SetBool("IsRunning", isRunningAnim);
         animator.SetBool("HasTorch",  hasTorch);
 
         // ─── 10. ITEM PICKUP (Torch & Swords) ───────────────────
@@ -1583,5 +1598,27 @@ public class PlayerController : MonoBehaviour
         Gizmos.DrawSphere(transform.position, pickupRange);
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, pickupRange);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  MISSING API METHODS (Added to fix compiler errors)
+    // ═══════════════════════════════════════════════════════════
+    [HideInInspector]
+    public bool isFrozen = false;
+
+    public void ShowInteractUI(bool show)
+    {
+        if (pressEUI != null) pressEUI.SetActive(show);
+    }
+
+    public void HealFull()
+    {
+        currentHealth = maxHealth;
+        OnHealthChanged?.Invoke(currentHealth);
+    }
+
+    public void SetTalking(bool isTalking)
+    {
+        isSpecialActionPlaying = isTalking;
     }
 }

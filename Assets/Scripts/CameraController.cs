@@ -165,6 +165,7 @@ public class CameraController : MonoBehaviour
 
         // ── 4. DESIRED DISTANCE ─────────
         float targetDist = defaultDistance;
+        /*
         if (isCrouchWalking)
         {
             targetDist = crouchWalkDistance;
@@ -180,6 +181,7 @@ public class CameraController : MonoBehaviour
                 target.position, playerController.ActiveGatePosition);
             targetDist = Mathf.Max(gateSpecialActionDistance, playerGateDist + magicZoomBuffer);
         }
+        */
 
         // ── 5. COLLISION CHECK ─────────
         Quaternion camRot = Quaternion.Euler(pitch, yaw, 0f);
