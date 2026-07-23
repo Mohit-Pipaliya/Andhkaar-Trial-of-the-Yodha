@@ -529,13 +529,13 @@ ModelImporter:
         length: 0
         modified: 0
     skeleton:
-    - name: Breathing Idle(Clone)
+    - name: Final Demon(Clone)
       parentName: 
       position: {x: 0, y: 0, z: 0}
       rotation: {x: 0, y: 0, z: 0, w: 1}
       scale: {x: 1, y: 1, z: 1}
     - name: mixamorig:Hips
-      parentName: Breathing Idle(Clone)
+      parentName: Final Demon(Clone)
       position: {x: 0.000004575291, y: 0.005038774, z: 0.000018543267}
       rotation: {x: -1.5324951e-11, y: 0.015797652, z: 1.0307434e-10, w: 0.99987525}
       scale: {x: 1, y: 1, z: 1}
@@ -860,7 +860,7 @@ ModelImporter:
       rotation: {x: 0, y: -0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1}
     - name: tripo_node_0f5fb2a0-c6b0-4376-9de4-e383e2f89aaa
-      parentName: Breathing Idle(Clone)
+      parentName: Final Demon(Clone)
       position: {x: -0, y: 0, z: 0}
       rotation: {x: 0, y: -0, z: -0, w: 1}
       scale: {x: 1, y: 1, z: 1}

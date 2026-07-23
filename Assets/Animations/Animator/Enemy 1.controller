@@ -193,15 +193,7 @@ BlendTree:
     m_Motion: {fileID: -203655887218126122, guid: 788b0bd8b1fb44adcb560125bf8abd64, type: 3}
     m_Threshold: 0
     m_Position: {x: 0, y: 0}
-    m_TimeScale: 0.01
-    m_CycleOffset: 0
-    m_DirectBlendParameter: Speed
-    m_Mirror: 0
-  - serializedVersion: 2
-    m_Motion: {fileID: 7400000, guid: c368dd553b71c9b4fa5a171047676a42, type: 2}
-    m_Threshold: 0.25
-    m_Position: {x: 0, y: 0}
-    m_TimeScale: 0.25
+    m_TimeScale: 1
     m_CycleOffset: 0
     m_DirectBlendParameter: Speed
     m_Mirror: 0
@@ -209,7 +201,7 @@ BlendTree:
     m_Motion: {fileID: 7400000, guid: a86a77ebdc2e4aa4e8599a218b515198, type: 2}
     m_Threshold: 0.5
     m_Position: {x: 0, y: 0}
-    m_TimeScale: 0.5
+    m_TimeScale: 1
     m_CycleOffset: 0
     m_DirectBlendParameter: Speed
     m_Mirror: 0
@@ -316,7 +308,7 @@ AnimatorController:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Enemy
+  m_Name: Enemy 1
   serializedVersion: 5
   m_AnimatorParameters:
   - m_Name: Speed

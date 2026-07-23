@@ -87,9 +87,12 @@ public class UIManager : MonoBehaviour
         ShowPanel(loadingPanel, false);
 
         // Sliders setup
-        healthSlider.maxValue = 100f;
-        healthSlider.value = 100f;
-        targetHealth = 100f;
+        PlayerController pc = FindFirstObjectByType<PlayerController>();
+        float pMaxHealth = (pc != null) ? pc.maxHealth : 1000f; // Default to 1000 fallback
+
+        healthSlider.maxValue = pMaxHealth;
+        healthSlider.value = pMaxHealth;
+        targetHealth = pMaxHealth;
 
         oilLampSlider.maxValue = 100f;
         oilLampSlider.value = 100f;

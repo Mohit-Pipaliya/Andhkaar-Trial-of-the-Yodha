@@ -183,10 +183,22 @@ public class PlayerController : MonoBehaviour
 
     [Header("Audio")]
     public AudioSource playerAudio;
+    public AudioClip jumpSound;
+    public AudioClip landingSound;
+    public AudioClip landingHardSound;
+    public AudioClip walkSound;
+    public AudioClip swordDrawSound;
+    public AudioClip shieldDrawSound;
+    public AudioClip slashSound;
+    public AudioClip damageSound;
+    public AudioClip deathSound;
+    public AudioClip dodgeSound;
+    public AudioClip healSound;
+    public float footstepInterval = 0.4f;
 
     [Header("Player Health & Events")]
-    public float maxHealth = 100f;
-    private float currentHealth;
+    public float maxHealth = 1000f;
+    public float currentHealth;
     
     // --- UI Events (Event-Driven Architecture) ---
     public static event Action<float> OnHealthChanged;
@@ -214,7 +226,6 @@ public class PlayerController : MonoBehaviour
     // ═══════════════════════════════════════════════════════════
     private CharacterController controller;
     private Animator animator;
-    private Transform mainCameraTransform;
     private Light sceneDirectionalLight;
 
     private float originalHeight;
@@ -296,6 +307,7 @@ public class PlayerController : MonoBehaviour
     // ═══════════════════════════════════════════════════════════
     void Awake()
     {
+        maxHealth = 1000f; // Forcefully set to 1000 in Awake taaki UIManager padhne se pehle update ho jaye
         moveAction = new InputAction("Move", type: InputActionType.Value);
         
         // Add WASD bindings
@@ -357,6 +369,30 @@ public class PlayerController : MonoBehaviour
     // ═══════════════════════════════════════════════════════════
     void Start()
     {
+        // --- AUTO-SETUP CAMERA (Force correct 3rd person behavior) ---
+        Camera mainCam = Camera.main;
+        if (mainCam == null) mainCam = FindFirstObjectByType<Camera>();
+        if (mainCam != null)
+        {
+            mainCam.transform.parent = null; // Unparent to prevent spinning
+            
+            // Disable CinemachineBrain if it exists to allow manual control
+            Behaviour brain = mainCam.GetComponent("CinemachineBrain") as Behaviour;
+            if (brain != null) brain.enabled = false;
+
+            // Add our CameraController if it's missing
+            CameraController camController = mainCam.GetComponent<CameraController>();
+            if (camController == null)
+            {
+                camController = mainCam.gameObject.AddComponent<CameraController>();
+                camController.distance = 4.5f;
+                camController.targetOffset = new Vector3(0, 1.5f, 0);
+            }
+            // Always ensure the target is this player!
+            camController.target = this.transform;
+        }
+        // -------------------------------------------------------------
+        
         // --- SETUP VALIDATION (Helps find missing Inspector settings) ---
         if (pressOUI == null) Debug.LogError("SETUP ERROR: 'Press O UI' is not assigned in PlayerController!");
         if (pressEUI == null) Debug.LogError("SETUP ERROR: 'Press E UI' is not assigned in PlayerController!");
@@ -371,11 +407,10 @@ public class PlayerController : MonoBehaviour
 
         controller           = GetComponent<CharacterController>();
         animator             = GetComponentInChildren<Animator>();
-        mainCameraTransform  = Camera.main.transform;
 
         if (controller == null) Debug.LogError("PlayerController: CharacterController is missing!");
         if (animator == null) Debug.LogWarning("PlayerController: Animator is missing!");
-        if (mainCameraTransform == null) Debug.LogWarning("PlayerController: Main Camera is missing!");
+        if (Camera.main == null) Debug.LogWarning("PlayerController: Main Camera is missing!");
 
         currentHealth = maxHealth; // Setup health
 
@@ -473,7 +508,31 @@ public class PlayerController : MonoBehaviour
     // ═══════════════════════════════════════════════════════════
     void Update()
     {
+        // Agar player mar gaya hai, to bas usko zameen par girne do, baki sab rok do!
+        if (currentHealth <= 0)
+        {
+            if (controller != null && !controller.isGrounded)
+            {
+                verticalVelocity += baseGravity * Time.deltaTime;
+                controller.Move(new Vector3(0f, verticalVelocity, 0f) * Time.deltaTime);
+            }
+            return;
+        }
+
         ApplyEnvironmentLighting();
+
+        // ─── HEALTH REGENERATION ────────────────────────────────
+        if (currentHealth < maxHealth && currentHealth > 0)
+        {
+            if (Time.time >= lastDamageTime + healthRegenDelay)
+            {
+                currentHealth += healthRegenRate * Time.deltaTime;
+                if (currentHealth > maxHealth) currentHealth = maxHealth;
+                
+                // UI update smoothly
+                OnHealthChanged?.Invoke(currentHealth);
+            }
+        }
 
         // ─── 1. READ INPUT ──────────────────────────────────────
         Vector2 rawInput     = moveAction.ReadValue<Vector2>();
@@ -485,8 +544,8 @@ public class PlayerController : MonoBehaviour
         Vector3 inputDir = new Vector3(rawInput.x, 0f, rawInput.y).normalized;
         bool    hasInput = rawInput.sqrMagnitude > 0.01f;
 
-        // If a special action is playing OR game is not active (paused/loading), block all input
-        if (isSpecialActionPlaying || isFrozen || !UIManager.isGameActive)
+        // If a special action is playing, player is dead, or game is not active (paused/loading), block all input
+        if (isSpecialActionPlaying || isFrozen || !UIManager.isGameActive || currentHealth <= 0)
         {
             hasInput = false;
             isRunning = false;
@@ -601,17 +660,46 @@ public class PlayerController : MonoBehaviour
         // Slow down movement during attack — adds physical weight to each strike
         if (isAttacking) currentSpeed *= attackMovementFraction;
 
+        Transform camTransform = Camera.main != null ? Camera.main.transform : null;
+        if (camTransform == null)
+        {
+            Camera fallbackCam = FindFirstObjectByType<Camera>();
+            if (fallbackCam != null) camTransform = fallbackCam.transform;
+        }
+
+        // --- NEW: Player hamesha wahi dekhega jahan camera dekh raha hai (Aim / Strafe Mode) ---
+        if (camTransform != null)
+        {
+            Vector3 currentRot = transform.eulerAngles;
+            Quaternion targetRot = Quaternion.Euler(currentRot.x, camTransform.eulerAngles.y, currentRot.z);
+            // Fast rotation so the player feels responsive to mouse movement
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * turnSmoothSpeed * 2f);
+        }
+
         Vector3 targetHorizontal = Vector3.zero;
         if (hasInput)
         {
-            Vector3 camF = mainCameraTransform.forward; camF.y = 0f; camF.Normalize();
-            Vector3 camR = mainCameraTransform.right;   camR.y = 0f; camR.Normalize();
-            Vector3 moveDir = (camF * inputDir.z + camR * inputDir.x).normalized;
+            Vector3 moveDir = Vector3.zero;
 
-            // Smooth rotation
-            if (moveDir != Vector3.zero)
-                transform.rotation = Quaternion.Slerp(transform.rotation,
-                    Quaternion.LookRotation(moveDir), Time.deltaTime * turnSmoothSpeed);
+            if (camTransform != null)
+            {
+                // Movement camera ke hisaab se hoga
+                Vector3 camF = camTransform.forward; camF.y = 0f; camF.Normalize();
+                Vector3 camR = camTransform.right;   camR.y = 0f; camR.Normalize();
+                moveDir = (camF * inputDir.z + camR * inputDir.x).normalized;
+            }
+            else
+            {
+                // Agar koi bhi camera na mile toh world space me move karo (crash bachane ke liye)
+                moveDir = new Vector3(inputDir.x, 0f, inputDir.z).normalized;
+                
+                // Fallback rotation if no camera exists
+                if (moveDir != Vector3.zero)
+                {
+                    transform.rotation = Quaternion.Slerp(transform.rotation,
+                        Quaternion.LookRotation(moveDir), Time.deltaTime * turnSmoothSpeed);
+                }
+            }
 
             targetHorizontal = moveDir * currentSpeed;
         }
@@ -1132,6 +1220,10 @@ public class PlayerController : MonoBehaviour
     {
     }
 
+    private float lastDamageTime = 0f; // Track kab aakhri baar chot lagi thi
+    public float healthRegenRate = 100f; // Har second kitni health badhegi (aap isko inspector me badal sakte hain)
+    public float healthRegenDelay = 5f;  // Damage lene ke kitne second baad health badhna shuru hogi
+
     public void TakeDamage(float damageAmount)
     {
         if (currentHealth <= 0) return; // Already dead
@@ -1139,16 +1231,38 @@ public class PlayerController : MonoBehaviour
         currentHealth -= damageAmount;
         if (currentHealth < 0) currentHealth = 0;
 
+        lastDamageTime = Time.time; // Record current time
+
         // Fire event to notify UI smoothly
         OnHealthChanged?.Invoke(currentHealth);
 
         if (currentHealth <= 0)
         {
-            OnPlayerDied?.Invoke();
-            // Yahan player marne ka animation ya ragdoll laga sakte ho
-            animator.SetTrigger("Die"); // Agar marne ka animation hai toh
-            this.enabled = false; // Disable controller
+            animator.SetTrigger("Die"); // Marne ka animation
+            // this.enabled = false; // Yahan disable mat karo warna coroutine stop ho jayega
+            StartCoroutine(DelayGameOver()); // Game over screen me delay taaki animation poora ho
         }
+        else
+        {
+            // Player Zinda hai, to usko Hit (Damage) ka reaction aana chahiye
+            animator.SetTrigger("Hit");
+            
+            // Optional: Thodi der ke liye input block kar do (Stun effect)
+            StartCoroutine(HitRecovery());
+        }
+    }
+
+    private System.Collections.IEnumerator HitRecovery()
+    {
+        isFrozen = true; // Player ko thodi der ke liye freeze kar do (na bhage na maare)
+        yield return new WaitForSeconds(0.4f); // 0.4 seconds ka flinch/stun
+        isFrozen = false; // Wapas normal
+    }
+
+    private System.Collections.IEnumerator DelayGameOver()
+    {
+        yield return new WaitForSeconds(4.0f); // 4 second ka delay taaki death animation poora ho jaye
+        OnPlayerDied?.Invoke();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -1179,7 +1293,12 @@ public class PlayerController : MonoBehaviour
         OnTorchStateChanged?.Invoke(true);
     }
 
-    private bool isLampFrozen = false; // Pray trigger me lamp drain freeze
+    public bool isLampFrozen = false; // Pray trigger me ya Arena me lamp drain freeze
+
+    public void SetLampFreeze(bool freeze)
+    {
+        isLampFrozen = freeze;
+    }
 
     private System.Collections.IEnumerator DrainLampOil()
     {
