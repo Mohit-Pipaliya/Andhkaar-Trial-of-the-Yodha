@@ -26,6 +26,16 @@ public class BossEnemyAi : MonoBehaviour
 
     [Header("Animation")]
     public Animator animator;
+    
+    [Header("Audio")]
+    public AudioSource bossAudio;
+    public AudioClip roarSound;
+    public AudioClip attackSound;
+    public AudioClip hitSound;
+    public AudioClip deathSound;
+    public AudioClip footstepSound;
+    private float footstepTimer;
+    private bool hasRoared = false;
 
     // Procedural Arena
     private GameObject proceduralArena;
@@ -76,6 +86,8 @@ public class BossEnemyAi : MonoBehaviour
         if (!isPlayerInArena && distanceToPlayer <= triggerRadius)
         {
             isPlayerInArena = true;
+            PlaySound(roarSound);
+            hasRoared = true;
             SpawnProceduralArena(); 
         }
 
@@ -87,10 +99,16 @@ public class BossEnemyAi : MonoBehaviour
         else if (distanceToPlayer <= triggerRadius)
         {
             currentState = EnemyState.Chasing;
+            if (!hasRoared)
+            {
+                PlaySound(roarSound);
+                hasRoared = true;
+            }
         }
         else
         {
             currentState = EnemyState.Idle; 
+            hasRoared = false;
         }
 
         // Animation logic based on BossEnemy.controller parameters
@@ -137,6 +155,17 @@ public class BossEnemyAi : MonoBehaviour
                 AttackPlayer();
                 break;
         }
+
+        // Footsteps logic
+        if (agent.velocity.magnitude > 0.1f)
+        {
+            footstepTimer -= Time.deltaTime;
+            if (footstepTimer <= 0f)
+            {
+                PlaySound(footstepSound);
+                footstepTimer = 0.5f; // Boss footstep is slower and heavier
+            }
+        }
     }
 
     void Idle()
@@ -168,6 +197,8 @@ public class BossEnemyAi : MonoBehaviour
                 if (randomAttack == 0) animator.SetTrigger("Attack1");
                 else if (randomAttack == 1) animator.SetTrigger("Attack2");
                 else animator.SetTrigger("JumpAttack");
+
+                PlaySound(attackSound);
             }
             
             StartCoroutine(DealDamageToPlayer()); 
@@ -206,10 +237,12 @@ public class BossEnemyAi : MonoBehaviour
         
         if (currentHealth > 0)
         {
+            PlaySound(hitSound);
             StartCoroutine(HitRecovery());
         }
         else
         {
+            PlaySound(deathSound);
             Die();
         }
     }
@@ -328,5 +361,14 @@ public class BossEnemyAi : MonoBehaviour
 
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
+    }
+
+    // --- AUDIO HELPER ---
+    public void PlaySound(AudioClip clip)
+    {
+        if (bossAudio != null && clip != null)
+        {
+            bossAudio.PlayOneShot(clip);
+        }
     }
 }
