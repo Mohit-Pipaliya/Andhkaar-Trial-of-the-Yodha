@@ -266,6 +266,7 @@ public class PlayerController : MonoBehaviour
     public bool IsSliding => isSliding;
     public bool IsAttacking => isAttacking;
     public bool IsSpecialActionPlaying => isSpecialActionPlaying;
+    public bool IsBlocking => false; // Added to satisfy EnemyBase references
     public bool IsCrouchWalking => isCrouchWalking; // Camera zoom-out ke liye
     // Torch Idle: torch hai + koi movement nahi + grounded + attack nahi
     public bool IsTorchIdle => hasTorch && !isCrouchWalking && !isAttacking && !isSpecialActionPlaying;
@@ -1117,6 +1118,20 @@ public class PlayerController : MonoBehaviour
     // ═══════════════════════════════════════════════════════════
     //  HEALTH SYSTEM
     // ═══════════════════════════════════════════════════════════
+    public void TakeDamage(float damageAmount, Vector3 hitPosition)
+    {
+        TakeDamage(damageAmount);
+    }
+
+    public void TakeDamageWithKnockback(float damageAmount, Vector3 hitPosition)
+    {
+        TakeDamage(damageAmount);
+    }
+
+    public void Stun(float duration)
+    {
+    }
+
     public void TakeDamage(float damageAmount)
     {
         if (currentHealth <= 0) return; // Already dead

@@ -2173,6 +2173,67 @@ Transform:
   m_Children: []
   m_Father: {fileID: 193063919}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &438993984
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 444.32812
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -4.5
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 174.37779
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: m_Name
+      value: warrok_w_kurniawan
+      objectReference: {fileID: 0}
+    - target: {fileID: 3103283877742750325, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 65e71407f806a8a49bb402e52726b2b0, type: 2}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: e9f37b1e4f4d73941972d5a624ed4c0e, type: 3}
 --- !u!1 &468307307
 GameObject:
   m_ObjectHideFlags: 0
@@ -11384,3 +11445,4 @@ SceneRoots:
   - {fileID: 2018837506}
   - {fileID: 2055335572}
   - {fileID: 844505026}
+  - {fileID: 438993984}
