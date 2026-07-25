@@ -29,13 +29,6 @@ public class EnemyAi : MonoBehaviour
     private NavMeshAgent agent;
     private bool isPlayerInArena = false; // Check karne ke liye ki player arena me trap ho chuka hai ya nahi
 
-    [Header("Audio")]
-    public AudioSource enemyAudio;
-    public AudioClip roarSound;
-    public AudioClip attackSound;
-    public AudioClip hitSound;
-    public AudioClip deathSound;
-    public AudioClip footstepSound;
     private float footstepTimer;
     private bool hasRoared = false;
 
@@ -129,7 +122,6 @@ public class EnemyAi : MonoBehaviour
         if (!isPlayerInArena && distanceToPlayer <= triggerRadius)
         {
             isPlayerInArena = true;
-            PlaySound(roarSound);
             hasRoared = true;
             SpawnProceduralArena(); // Automatically ek gol (ring) deewar banayega
         }
@@ -155,7 +147,6 @@ public class EnemyAi : MonoBehaviour
             footstepTimer -= Time.deltaTime;
             if (footstepTimer <= 0f)
             {
-                PlaySound(footstepSound);
                 footstepTimer = 0.4f; // Chase running speed
             }
         }
@@ -245,7 +236,6 @@ public class EnemyAi : MonoBehaviour
             {
                 // CrossFade time bohot kam kar diya (0.05) taaki ekdum se attack kare
                 animator.CrossFade("Attack1", 0.05f); 
-                PlaySound(attackSound);
             }
             
             Debug.Log("Enemy Attacking Player!");
@@ -289,12 +279,10 @@ public class EnemyAi : MonoBehaviour
         
         if (currentHealth <= 0)
         {
-            PlaySound(deathSound);
             Die();
         }
         else
         {
-            PlaySound(hitSound);
             StartCoroutine(HitRecovery());
         }
     }
@@ -434,14 +422,5 @@ public class EnemyAi : MonoBehaviour
         // Attack Range (Red)
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
-    }
-
-    // --- AUDIO HELPER ---
-    public void PlaySound(AudioClip clip)
-    {
-        if (enemyAudio != null && clip != null)
-        {
-            enemyAudio.PlayOneShot(clip);
-        }
     }
 }

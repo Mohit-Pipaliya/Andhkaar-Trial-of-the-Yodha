@@ -181,20 +181,6 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Special action ke dauran environment ko thoda brighter karne ka effect")]
     public float specialAmbientBoost = 0.12f;
 
-    [Header("Audio")]
-    public AudioSource playerAudio;
-    public AudioClip jumpSound;
-    public AudioClip landingSound;
-    public AudioClip landingHardSound;
-    public AudioClip walkSound;
-    public AudioClip swordDrawSound;
-    public AudioClip shieldDrawSound;
-    public AudioClip slashSound;
-    public AudioClip damageSound;
-    public AudioClip deathSound;
-    public AudioClip dodgeSound;
-    public AudioClip healSound;
-    public float footstepInterval = 0.4f;
 
     [Header("Player Health & Events")]
     public float maxHealth = 1000f;
@@ -1075,8 +1061,6 @@ public class PlayerController : MonoBehaviour
         beam1Core.endColor = new Color(coreColor.r, coreColor.g, coreColor.b, 0.2f);
         beam1Core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         
-        // Add Audio
-        beam1Obj.AddComponent<ProceduralLaserAudio>();
 
         // ── Left hand — Glow ──
         GameObject beam1GlowObj = new GameObject("LaserBeam1Glow");
@@ -1104,8 +1088,6 @@ public class PlayerController : MonoBehaviour
         beam2Core.endColor = new Color(coreColor.r, coreColor.g, coreColor.b, 0.2f);
         beam2Core.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
-        // Add Audio
-        beam2Obj.AddComponent<ProceduralLaserAudio>();
 
         // ── Right hand — Glow ──
         GameObject beam2GlowObj = new GameObject("LaserBeam2Glow");
@@ -1304,8 +1286,10 @@ public class PlayerController : MonoBehaviour
     {
         while (hasTorch && handLampLight != null && handLampLight.intensity > 0)
         {
-            // Pray trigger zone mein hain? Drain freeze karo
-            if (!isLampFrozen)
+            bool isSlideHeld = slideAction != null && slideAction.ReadValue<float>() > 0.1f;
+            
+            // Pray trigger zone mein hain ya crouch control daba hua hai? Drain freeze karo
+            if (!isLampFrozen && !(isSlideHeld && isSliding))
             {
                 handLampLight.intensity -= lampDrainRate * Time.deltaTime;
 

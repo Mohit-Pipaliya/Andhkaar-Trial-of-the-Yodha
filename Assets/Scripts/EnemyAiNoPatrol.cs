@@ -27,13 +27,6 @@ public class EnemyAiNoPatrol : MonoBehaviour
     [Header("Animation")]
     public Animator animator;
     
-    [Header("Audio")]
-    public AudioSource enemyAudio;
-    public AudioClip roarSound;
-    public AudioClip attackSound;
-    public AudioClip hitSound;
-    public AudioClip deathSound;
-    public AudioClip footstepSound;
     private float footstepTimer;
     private bool hasRoared = false;
 
@@ -111,7 +104,6 @@ public class EnemyAiNoPatrol : MonoBehaviour
         if (!isPlayerInArena && distanceToPlayer <= triggerRadius)
         {
             isPlayerInArena = true;
-            PlaySound(roarSound);
             hasRoared = true;
             SpawnProceduralArena(); // Automatically ek gol (ring) deewar banayega
         }
@@ -126,7 +118,6 @@ public class EnemyAiNoPatrol : MonoBehaviour
             currentState = EnemyState.Chasing;
             if (!hasRoared)
             {
-                PlaySound(roarSound);
                 hasRoared = true;
             }
         }
@@ -189,7 +180,6 @@ public class EnemyAiNoPatrol : MonoBehaviour
             footstepTimer -= Time.deltaTime;
             if (footstepTimer <= 0f)
             {
-                PlaySound(footstepSound);
                 footstepTimer = 0.4f; // Running speed
             }
         }
@@ -221,7 +211,6 @@ public class EnemyAiNoPatrol : MonoBehaviour
             if (animator != null)
             {
                 animator.CrossFade("Attack1", 0.05f); 
-                PlaySound(attackSound);
             }
             
             StartCoroutine(DealDamageToPlayer()); 
@@ -260,12 +249,10 @@ public class EnemyAiNoPatrol : MonoBehaviour
         
         if (currentHealth > 0)
         {
-            PlaySound(hitSound);
             StartCoroutine(HitRecovery());
         }
         else
         {
-            PlaySound(deathSound);
             Die();
         }
     }
@@ -388,14 +375,5 @@ public class EnemyAiNoPatrol : MonoBehaviour
 
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
-    }
-
-    // --- AUDIO HELPER ---
-    public void PlaySound(AudioClip clip)
-    {
-        if (enemyAudio != null && clip != null)
-        {
-            enemyAudio.PlayOneShot(clip);
-        }
     }
 }
