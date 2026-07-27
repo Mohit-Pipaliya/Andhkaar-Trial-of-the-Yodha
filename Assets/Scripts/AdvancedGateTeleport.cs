@@ -102,10 +102,10 @@ public class AdvancedGateTeleport : MonoBehaviour
     {
         if (player == null || isTeleporting) return;
 
-        float distTo1 = Vector3.Distance(player.position, trigger1.position);
-        float distTo4 = Vector3.Distance(player.position, trigger4.position);
+        bool inTrigger1 = IsPlayerInTrigger(trigger1);
+        bool inTrigger4 = IsPlayerInTrigger(trigger4);
 
-        if (distTo1 <= triggerDistance)
+        if (inTrigger1)
         {
             if (currentGateZone != 1) currentGateZone = 1;
             uiActive = true;
@@ -113,7 +113,7 @@ public class AdvancedGateTeleport : MonoBehaviour
             if (Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame)
                 StartCoroutine(TeleportSequence(trigger1, trigger2, trigger3, trigger4));
         }
-        else if (distTo4 <= triggerDistance)
+        else if (inTrigger4)
         {
             if (currentGateZone != 2) currentGateZone = 2;
             uiActive = true;
@@ -126,6 +126,30 @@ public class AdvancedGateTeleport : MonoBehaviour
             if (currentGateZone != 0) currentGateZone = 0;
             uiActive = false;
         }
+    }
+
+    private bool IsPlayerInTrigger(Transform t)
+    {
+        if (t == null) return false;
+        
+        // 1. Agar trigger par BoxCollider (ya koi aur) hai, toh uske andar check karo
+        Collider col = t.GetComponent<Collider>();
+        if (col != null)
+        {
+            // Player ka center thoda upar hota hai, isliye upar/neeche dono check karo
+            if (col.bounds.Contains(player.position) || col.bounds.Contains(player.position + Vector3.up * 1f))
+                return true;
+        }
+
+        // 2. Fallback: Agar collider nahi hai, toh distance check karo (X aur Z axis par zyada focus)
+        float distance = Vector3.Distance(player.position, t.position);
+        
+        // 3. 2D Distance check (sirf X aur Z, taaki Y axis ka farq na pade)
+        Vector2 pPos = new Vector2(player.position.x, player.position.z);
+        Vector2 tPos = new Vector2(t.position.x, t.position.z);
+        float dist2D = Vector2.Distance(pPos, tPos);
+
+        return distance <= triggerDistance || dist2D <= (triggerDistance * 0.8f);
     }
 
     void OnGUI()
@@ -285,115 +309,136 @@ public class AdvancedGateTeleport : MonoBehaviour
 
     private ParticleSystem CreatePortalRing(Vector3 pos)
     {
-        GameObject psObj = new GameObject("PortalRing_AAA");
+        GameObject psObj = new GameObject("PortalRing_AAA_Magical");
         psObj.transform.position = pos;
         psObj.transform.rotation = Quaternion.Euler(90f, 0f, 0f); // Stand upright
-        
-        // --- 1. CORE RING (Thick, fiery energy) ---
+
+        // --- 1. THE DARK CORE (Black hole void in center) ---
+        GameObject voidObj = new GameObject("PortalVoid");
+        voidObj.transform.SetParent(psObj.transform, false);
+        ParticleSystem voidPs = voidObj.AddComponent<ParticleSystem>();
+        var vMain = voidPs.main;
+        vMain.startLifetime = 1.5f;
+        vMain.startSpeed = 0f;
+        vMain.startSize = 9.0f; // Big black circle
+        vMain.startColor = Color.black;
+        vMain.simulationSpace = ParticleSystemSimulationSpace.World;
+        vMain.maxParticles = 5;
+        var vEm = voidPs.emission;
+        vEm.rateOverTime = 5f;
+        var vShape = voidPs.shape;
+        vShape.shapeType = ParticleSystemShapeType.Circle;
+        vShape.radius = 0.1f;
+        ParticleSystemRenderer vPsr = voidPs.GetComponent<ParticleSystemRenderer>();
+        Shader vShader = GetValidParticleShader();
+        if (vShader != null) vPsr.material = new Material(vShader);
+        if (vPsr.material.HasProperty("_BaseColor")) vPsr.material.SetColor("_BaseColor", Color.black);
+        else if (vPsr.material.HasProperty("_Color")) vPsr.material.SetColor("_Color", Color.black);
+
+        // --- 2. THE CORE RING (Thick, fiery magical energy) ---
         ParticleSystem corePs = psObj.AddComponent<ParticleSystem>();
         var main = corePs.main;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.5f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(0.5f, 1.5f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.4f, 0.9f); // THICKER PARTICLES
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.5f, 1.2f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.2f, 1.0f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.6f, 1.2f); // Ultra THICK
         main.startColor = magicGlowColor;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.loop = true;
-        main.maxParticles = 3000;
+        main.maxParticles = 5000;
+        main.prewarm = true; // Ring is fully formed instantly!
 
         var em = corePs.emission;
-        em.rateOverTime = 1200f; // VERY DENSE
+        em.rateOverTime = 2500f; // EXTREMELY DENSE
 
         var shape = corePs.shape;
         shape.shapeType = ParticleSystemShapeType.Circle;
-        shape.radius = 4.8f; // BIGGER RING (Almost 10m diameter)
-        shape.radiusThickness = 0.15f; 
+        shape.radius = 4.8f; // Standard 10m diameter
+        shape.radiusThickness = 0.1f; // Sharp edge
         shape.arcMode = ParticleSystemShapeMultiModeValue.Loop;
 
         var vel = corePs.velocityOverLifetime;
         vel.enabled = true;
-        vel.orbitalY = 10f; // FAST SPIN
-        vel.radial = -2.5f;  // SUCK INWARD
+        vel.orbitalY = 15f; // FAST SPIN
+        vel.radial = -3.5f;  // STRONG SUCK INWARD
         
         var noise = corePs.noise;
         noise.enabled = true;
-        noise.strength = 1.5f;
-        noise.frequency = 1.2f;
-        noise.scrollSpeed = 2f;
+        noise.strength = 2.5f;
+        noise.frequency = 1.5f;
+        noise.scrollSpeed = 3f;
 
         var col = corePs.colorOverLifetime;
         col.enabled = true;
         Gradient grad = new Gradient();
         grad.SetKeys(
-            new GradientColorKey[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(magicGlowColor, 0.3f), new GradientColorKey(Color.black, 1f) },
-            new GradientAlphaKey[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f), new GradientAlphaKey(0f, 1f) }
+            new GradientColorKey[] { new GradientColorKey(Color.yellow, 0f), new GradientColorKey(magicGlowColor, 0.4f), new GradientColorKey(Color.red, 0.8f), new GradientColorKey(Color.black, 1f) },
+            new GradientAlphaKey[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f), new GradientAlphaKey(1f, 0.8f), new GradientAlphaKey(0f, 1f) }
         );
         col.color = grad;
 
         ParticleSystemRenderer corePsr = corePs.GetComponent<ParticleSystemRenderer>();
-        Shader validShader = GetValidParticleShader();
-        if (validShader != null)
+        if (vShader != null)
         {
-            corePsr.material = new Material(validShader);
+            corePsr.material = new Material(vShader);
             if (corePsr.material.HasProperty("_BaseColor"))
-                corePsr.material.SetColor("_BaseColor", magicGlowColor * 2.5f);
+                corePsr.material.SetColor("_BaseColor", magicGlowColor * 3.5f); // Super bright HDR
             else if (corePsr.material.HasProperty("_Color"))
-                corePsr.material.SetColor("_Color", magicGlowColor * 2.5f);
+                corePsr.material.SetColor("_Color", magicGlowColor * 3.5f);
         }
 
-        // --- 2. SPARKS (Doctor Strange style flying embers) ---
+        // --- 3. DOCTOR STRANGE SPARKS (Explosive trails) ---
         GameObject sparksObj = new GameObject("PortalSparks");
         sparksObj.transform.SetParent(psObj.transform, false);
         ParticleSystem sparksPs = sparksObj.AddComponent<ParticleSystem>();
         
         var sMain = sparksPs.main;
-        sMain.startLifetime = new ParticleSystem.MinMaxCurve(0.5f, 1.2f);
-        sMain.startSpeed = new ParticleSystem.MinMaxCurve(4f, 12f); // EXPLOSIVE SPEED
-        sMain.startSize = new ParticleSystem.MinMaxCurve(0.05f, 0.2f); // SMALL DOTS
-        sMain.startColor = new Color(1f, 0.9f, 0.4f, 1f); // Bright yellow/white sparks
+        sMain.startLifetime = new ParticleSystem.MinMaxCurve(0.4f, 1.5f);
+        sMain.startSpeed = new ParticleSystem.MinMaxCurve(6f, 18f); // INSANE EXPLOSIVE SPEED
+        sMain.startSize = new ParticleSystem.MinMaxCurve(0.05f, 0.25f);
+        sMain.startColor = new Color(1f, 0.9f, 0.5f, 1f);
         sMain.simulationSpace = ParticleSystemSimulationSpace.World;
-        sMain.maxParticles = 1000;
+        sMain.maxParticles = 2000;
+        sMain.prewarm = true;
         
         var sEm = sparksPs.emission;
-        sEm.rateOverTime = 400f;
+        sEm.rateOverTime = 800f;
         
         var sShape = sparksPs.shape;
         sShape.shapeType = ParticleSystemShapeType.Circle;
         sShape.radius = 4.8f;
-        sShape.radiusThickness = 0.01f;
+        sShape.radiusThickness = 0.05f;
         
         var sVel = sparksPs.velocityOverLifetime;
         sVel.enabled = true;
-        sVel.orbitalY = 15f; // EXTREME SPIN
-        sVel.radial = 4f; // FLY OUTWARD
+        sVel.orbitalY = 25f; // CRAZY SPIN
+        sVel.radial = 6f; // FLY OUTWARD (sparks fly out of the portal)
         
         var sNoise = sparksPs.noise;
         sNoise.enabled = true;
-        sNoise.strength = 4f;
-        sNoise.frequency = 3f;
+        sNoise.strength = 6f;
+        sNoise.frequency = 4f;
 
         var sCol = sparksPs.colorOverLifetime;
         sCol.enabled = true;
         Gradient sGrad = new Gradient();
         sGrad.SetKeys(
-            new GradientColorKey[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(1f, 0.5f, 0f), 0.5f), new GradientColorKey(Color.black, 1f) },
-            new GradientAlphaKey[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.5f), new GradientAlphaKey(0f, 1f) }
+            new GradientColorKey[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(1f, 0.6f, 0f), 0.3f), new GradientColorKey(Color.red, 0.7f), new GradientColorKey(Color.black, 1f) },
+            new GradientAlphaKey[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.6f), new GradientAlphaKey(0f, 1f) }
         );
         sCol.color = sGrad;
         
         ParticleSystemRenderer sPsr = sparksPs.GetComponent<ParticleSystemRenderer>();
-        Shader sparkShader = GetValidParticleShader();
-        if (sparkShader != null)
-        {
-            sPsr.material = new Material(sparkShader);
-        }
-        sPsr.material.color = new Color(2f, 1.5f, 0.5f); // SUPER BRIGHT HDR
+        if (vShader != null) sPsr.material = new Material(vShader);
+        sPsr.material.color = new Color(3f, 2f, 0.5f); // EXTREME HDR WHITE/YELLOW
         sPsr.trailMaterial = sPsr.material;
         
         var sTrails = sparksPs.trails;
         sTrails.enabled = true;
-        sTrails.ratio = 0.4f;
-        sTrails.lifetimeMultiplier = 0.05f;
+        sTrails.ratio = 0.6f;
+        sTrails.lifetimeMultiplier = 0.08f;
+        sTrails.colorOverLifetime = sGrad;
 
+        voidPs.Play();
         corePs.Play();
         sparksPs.Play();
         
