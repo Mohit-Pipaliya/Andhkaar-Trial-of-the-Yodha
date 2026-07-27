@@ -40,7 +40,8 @@ public class FinalBossHorrorVFX : MonoBehaviour
         SkinnedMeshRenderer[] meshes = GetComponentsInChildren<SkinnedMeshRenderer>();
         foreach (SkinnedMeshRenderer smr in meshes)
         {
-            foreach (Material mat in smr.materials)
+            Material[] mats = Application.isPlaying ? smr.materials : smr.sharedMaterials;
+            foreach (Material mat in mats)
             {
                 // Pure Black color for a shadow demon look
                 if (mat.HasProperty("_Color"))
@@ -221,7 +222,8 @@ public class FinalBossHorrorVFX : MonoBehaviour
         mat.EnableKeyword("_ALPHABLEND_ON");
         mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
         mat.renderQueue = 3000;
-        renderer.material = mat;
+        if (Application.isPlaying) renderer.material = mat;
+        else renderer.sharedMaterial = mat;
     }
 
     void CreateBleedingEyes()
@@ -252,7 +254,8 @@ public class FinalBossHorrorVFX : MonoBehaviour
         mat.SetColor("_Color", Color.red);
         mat.EnableKeyword("_EMISSION");
         mat.SetColor("_EmissionColor", Color.red * 10f); // Chamakti hui laal trail
-        tr.material = mat;
+        if (Application.isPlaying) tr.material = mat;
+        else tr.sharedMaterial = mat;
     }
 
     IEnumerator HeavyBreathingRoutine()
@@ -294,7 +297,8 @@ public class FinalBossHorrorVFX : MonoBehaviour
         defaultMat.EnableKeyword("_ALPHABLEND_ON");
         defaultMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
         defaultMat.renderQueue = 3000;
-        renderer.material = defaultMat;
+        if (Application.isPlaying) renderer.material = defaultMat;
+        else renderer.sharedMaterial = defaultMat;
     }
 
     private Transform FindDeepChild(Transform parent, string name)

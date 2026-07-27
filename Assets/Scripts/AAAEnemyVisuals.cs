@@ -26,7 +26,8 @@ public class AAAEnemyVisuals : MonoBehaviour
         SkinnedMeshRenderer[] meshes = GetComponentsInChildren<SkinnedMeshRenderer>();
         foreach (SkinnedMeshRenderer smr in meshes)
         {
-            foreach (Material mat in smr.materials)
+            Material[] mats = Application.isPlaying ? smr.materials : smr.sharedMaterials;
+            foreach (Material mat in mats)
             {
                 // Pure Black color for a shadow demon look
                 if (mat.HasProperty("_Color"))
@@ -122,7 +123,8 @@ public class AAAEnemyVisuals : MonoBehaviour
         defaultMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
         defaultMat.renderQueue = 3000;
         
-        renderer.material = defaultMat;
+        if (Application.isPlaying) renderer.material = defaultMat;
+        else renderer.sharedMaterial = defaultMat;
     }
 
     // Helper to find bones recursively

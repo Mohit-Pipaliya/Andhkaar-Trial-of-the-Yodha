@@ -23,6 +23,7 @@ public class DoubleDoorController : MonoBehaviour
     [Header("Audio Settings")]
     public AudioSource doorAudioSource;
     public AudioClip doorOpenSound;
+    public AudioClip doorCloseSound;
 
     private bool isPlayerNear = false;
     private bool isOpen = false;
@@ -58,46 +59,53 @@ public class DoubleDoorController : MonoBehaviour
 
     void Update()
     {
+        if (playerTransform == null) return;
+
         // 1. Detection Logic
-        if (playerTransform != null && !isOpen)
+        bool playerInZone = false;
+
+        // Agar user ne koi Trigger Area assign kiya hai inspector me
+        if (triggerArea != null)
         {
-            bool playerInZone = false;
+            // Check if player is inside the assigned Trigger Area's bounds
+            if (triggerArea.bounds.Contains(playerTransform.position))
+            {
+                playerInZone = true;
+            }
+        }
+        else
+        {
+            // Agar Trigger Area khali hai, toh distance se check karega
+            float distance = Vector3.Distance(transform.position, playerTransform.position);
+            if (distance <= interactionDistance)
+            {
+                playerInZone = true;
+            }
+        }
 
-            // Agar user ne koi Trigger Area assign kiya hai inspector me
-            if (triggerArea != null)
+        // UI Show/Hide and Close Logic
+        if (playerInZone)
+        {
+            if (!isPlayerNear)
             {
-                // Check if player is inside the assigned Trigger Area's bounds
-                if (triggerArea.bounds.Contains(playerTransform.position))
-                {
-                    playerInZone = true;
-                }
+                isPlayerNear = true;
+                if (!isOpen && openDoorUI != null) openDoorUI.SetActive(true);
             }
-            else
+        }
+        else
+        {
+            if (isPlayerNear)
             {
-                // Agar Trigger Area khali hai, toh distance se check karega
-                float distance = Vector3.Distance(transform.position, playerTransform.position);
-                if (distance <= interactionDistance)
-                {
-                    playerInZone = true;
-                }
+                isPlayerNear = false;
+                if (openDoorUI != null) openDoorUI.SetActive(false);
             }
 
-            // UI Show/Hide Logic
-            if (playerInZone)
+            // Close the door automatically when the player leaves the zone
+            if (isOpen)
             {
-                if (!isPlayerNear)
-                {
-                    isPlayerNear = true;
-                    if (openDoorUI != null) openDoorUI.SetActive(true);
-                }
-            }
-            else
-            {
-                if (isPlayerNear)
-                {
-                    isPlayerNear = false;
-                    if (openDoorUI != null) openDoorUI.SetActive(false);
-                }
+                Debug.Log("[Door] Player left the zone, closing the door.");
+                isOpen = false;
+                if (doorAudioSource != null && doorCloseSound != null) doorAudioSource.PlayOneShot(doorCloseSound);
             }
         }
 
@@ -115,27 +123,23 @@ public class DoubleDoorController : MonoBehaviour
         }
 
         // 3. Smooth Door Animation
-        if (isOpen)
-        {
-            float speedInDegrees = openSpeed * 50f; // Speed of opening
+        float speedInDegrees = openSpeed * 50f; // Speed of opening/closing
+        float targetLeftAngle = isOpen ? leftDoorOpenAngle : 0f;
+        float targetRightAngle = isOpen ? rightDoorOpenAngle : 0f;
 
-            // Explicitly move the angle towards the target
-            currentLeftAngle = Mathf.MoveTowards(currentLeftAngle, leftDoorOpenAngle, speedInDegrees * Time.deltaTime);
-            currentRightAngle = Mathf.MoveTowards(currentRightAngle, rightDoorOpenAngle, speedInDegrees * Time.deltaTime);
+        // Explicitly move the angle towards the target
+        currentLeftAngle = Mathf.MoveTowards(currentLeftAngle, targetLeftAngle, speedInDegrees * Time.deltaTime);
+        currentRightAngle = Mathf.MoveTowards(currentRightAngle, targetRightAngle, speedInDegrees * Time.deltaTime);
+        
+        // Apply the exact angle to the doors
+        if (leftDoor != null) 
+            leftDoor.localRotation = leftDoorClosedRot * Quaternion.Euler(0, currentLeftAngle, 0);
+        else
+            Debug.LogError("[Door ERROR] Left Door is missing (not assigned in inspector)!");
             
-            // Uncomment to debug animation frames
-            // Debug.Log($"[Door] Animating... LeftAngle: {currentLeftAngle}, RightAngle: {currentRightAngle}");
-            
-            // Apply the exact angle to the doors
-            if (leftDoor != null) 
-                leftDoor.localRotation = leftDoorClosedRot * Quaternion.Euler(0, currentLeftAngle, 0);
-            else
-                Debug.LogError("[Door ERROR] Left Door is missing (not assigned in inspector)!");
-                
-            if (rightDoor != null) 
-                rightDoor.localRotation = rightDoorClosedRot * Quaternion.Euler(0, currentRightAngle, 0);
-            else
-                Debug.LogError("[Door ERROR] Right Door is missing (not assigned in inspector)!");
-        }
+        if (rightDoor != null) 
+            rightDoor.localRotation = rightDoorClosedRot * Quaternion.Euler(0, currentRightAngle, 0);
+        else
+            Debug.LogError("[Door ERROR] Right Door is missing (not assigned in inspector)!");
     }
 }

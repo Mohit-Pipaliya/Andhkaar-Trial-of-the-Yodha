@@ -32,6 +32,9 @@ public class CameraController : MonoBehaviour
     private float currentX = 0f;
     private float currentY = 20f;
 
+    // External shake offset (set by other scripts e.g. FlyAndCollectMechanic)
+    [HideInInspector] public Vector3 shakeOffset = Vector3.zero;
+
     void Start()
     {
         // UNPARENT the camera! If it's a child of the player, it will cause wild spinning.
@@ -132,8 +135,9 @@ public class CameraController : MonoBehaviour
             currentDistance = hit.distance - 0.1f;
         }
 
-        // 5. Apply Final Position & Rotation
+        // 5. Apply Final Position & Rotation (shake offset applied here)
         Vector3 finalPosition = targetPos + rotation * new Vector3(0, 0, -currentDistance);
+        finalPosition += shakeOffset;
 
         transform.position = Vector3.Lerp(transform.position, finalPosition, Time.deltaTime * smoothSpeed);
         transform.rotation = rotation;

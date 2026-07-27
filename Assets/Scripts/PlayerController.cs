@@ -1289,7 +1289,9 @@ public class PlayerController : MonoBehaviour
             bool isSlideHeld = slideAction != null && slideAction.ReadValue<float>() > 0.1f;
             
             // Pray trigger zone mein hain ya crouch control daba hua hai? Drain freeze karo
-            if (!isLampFrozen && !(isSlideHeld && isSliding))
+            // Oil lamp tab tak drain nahi hoga jab tak player ke paas koi sword na ho
+            bool hasAnySword = hasSword1 || hasSword2;
+            if (!isLampFrozen && !(isSlideHeld && isSliding) && hasAnySword)
             {
                 handLampLight.intensity -= lampDrainRate * Time.deltaTime;
 

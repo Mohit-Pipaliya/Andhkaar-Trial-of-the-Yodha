@@ -508,7 +508,8 @@ MonoBehaviour:
   rightDoorOpenAngle: 90
   openSpeed: 3
   triggerArea: {fileID: 1554917819846550609}
-  interactionDistance: 15
+  interactionDistance: 10
   openDoorUI: {fileID: 0}
   doorAudioSource: {fileID: 0}
   doorOpenSound: {fileID: 0}
+  doorCloseSound: {fileID: 0}

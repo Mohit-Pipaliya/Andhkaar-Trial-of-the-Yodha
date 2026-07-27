@@ -109,7 +109,8 @@ public class ExtremeHorrorVFX : MonoBehaviour
         defaultMat.EnableKeyword("_ALPHABLEND_ON");
         defaultMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
         defaultMat.renderQueue = 3000;
-        renderer.material = defaultMat;
+        if (Application.isPlaying) renderer.material = defaultMat;
+        else renderer.sharedMaterial = defaultMat;
     }
 
     void CreateHellEmbers()
@@ -156,7 +157,8 @@ public class ExtremeHorrorVFX : MonoBehaviour
         mat.SetColor("_Color", Color.red);
         mat.EnableKeyword("_EMISSION");
         mat.SetColor("_EmissionColor", Color.red * 10f); // Embers ko chamkane ke liye
-        renderer.material = mat;
+        if (Application.isPlaying) renderer.material = mat;
+        else renderer.sharedMaterial = mat;
     }
 
     IEnumerator TwitchRoutine()
