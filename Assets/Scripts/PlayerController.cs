@@ -157,8 +157,8 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Hand Lamp ke andar jo Point Light hai, use yahan drag karein")]
     public Light handLampLight;
 
-    [Tooltip("Kitni tezi se oil kam hoga (Bada number = jaldi khatam). 0.1 = ~1000 seconds mein khatam.")]
-    public float lampDrainRate = 0.1f; // 100 intensity / 0.1 = ~1000 seconds (~16 min)
+    [Tooltip("Kitni tezi se oil kam hoga (Bada number = jaldi khatam). 0.02 = bohot slow drain (~80 mins).")]
+    public float lampDrainRate = 0.02f; 
     [Tooltip("Light ki starting intensity.")]
     public float maxLampIntensity = 100f;
 

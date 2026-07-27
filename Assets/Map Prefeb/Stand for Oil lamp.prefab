@@ -79,7 +79,7 @@ Transform:
   m_GameObject: {fileID: 4080786089099584181}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.06, y: 0.16, z: 0.762}
+  m_LocalPosition: {x: -0.076, y: 0.399, z: 0.344}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -355,6 +355,7 @@ MonoBehaviour:
   trigger2: {fileID: 940220980337141277}
   interactionDistance: 15
   flySpeed: 10
+  freezePlayerAtTrigger2: 1
   pointLight: {fileID: 5393383418409790678}
   collectibleObject: {fileID: 0}
   pressFUI: {fileID: 0}

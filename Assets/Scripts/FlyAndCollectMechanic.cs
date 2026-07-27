@@ -14,6 +14,8 @@ public class FlyAndCollectMechanic : MonoBehaviour
     [Header("Flying Settings")]
     [Tooltip("Player ke udne ki speed")]
     public float flySpeed = 10f;
+    [Tooltip("Agar sach (true) hai, toh player Trigger 2 par pahuche ke baad move nahi kar payega jab tak object collect na kare")]
+    public bool freezePlayerAtTrigger2 = true;
 
     [Header("Object & Light Setup")]
     [Tooltip("Trigger 2 pe jo Point Light chalu karni hai, use yaha dale")]
@@ -118,21 +120,7 @@ public class FlyAndCollectMechanic : MonoBehaviour
 
         bool reachedTarget = false;
 
-        // Check if player touched the target trigger collider early
-        if (nextState == MechanicState.AtTrigger2 && trigger2 != null)
-        {
-            Collider col = trigger2.GetComponent<Collider>();
-            if (col != null && col.bounds.Contains(playerTransform.position))
-                reachedTarget = true;
-        }
-        else if (nextState == MechanicState.Idle && trigger1 != null)
-        {
-            Collider col = trigger1.GetComponent<Collider>();
-            if (col != null && col.bounds.Contains(playerTransform.position))
-                reachedTarget = true;
-        }
-
-        // Fallback: Check exact distance
+        // Force exactly to the center of the trigger target
         if (Vector3.Distance(playerTransform.position, targetPos) < 0.1f)
         {
             reachedTarget = true;
@@ -144,7 +132,11 @@ public class FlyAndCollectMechanic : MonoBehaviour
 
             if (nextState == MechanicState.AtTrigger2)
             {
-                if (charController != null) charController.enabled = true;
+                // Agar freeze on hai, to player ko move karne se rok kar rakho (charController off rakho)
+                if (!freezePlayerAtTrigger2) 
+                {
+                    if (charController != null) charController.enabled = true;
+                }
                 if (playerCtrl != null) playerCtrl.SetLampFreeze(false);
             }
             else if (nextState == MechanicState.Idle)
