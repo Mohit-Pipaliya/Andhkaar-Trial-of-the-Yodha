@@ -13,6 +13,10 @@ TagManager:
   - Trigger 2
   - Trigger 3
   - Trigger 4
+  - Gate 1
+  - Gate 2
+  - Gate 3
+  - Gate 4
   layers:
   - Default
   - TransparentFX

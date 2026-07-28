@@ -6,7 +6,7 @@ using UnityEngine.UI;
 [RequireComponent(typeof(NavMeshAgent))]
 public class EnemyAi : MonoBehaviour
 {
-    public enum EnemyState { Patrolling, Chasing, Attacking, Hit }
+    public enum EnemyState { Patrolling, Chasing, Telegraphing, Attacking, Hit }
     public EnemyState currentState = EnemyState.Patrolling;
 
     [Header("Patrol Settings")]
@@ -14,26 +14,39 @@ public class EnemyAi : MonoBehaviour
     public Transform pointB;
     private Transform currentPatrolTarget;
 
-    [Header("Targeting & Ranges")]
+    [Header("Vision & Hearing (AAA Features)")]
     public Transform player;
-    public float triggerRadius = 15f; // Jab player iske andar aayega, enemy chase karega
-    public float attackRange = 2f;    // Attack karne ki range
+    [Tooltip("Kitni door tak dekh sakta hai")]
+    public float viewRadius = 20f;
+    [Tooltip("Aankhon ka angle (FOV). 110 degree matlab aage ki taraf thoda wide.")]
+    [Range(0, 360)] public float viewAngle = 110f;
+    [Tooltip("Agar player iske paas aawaz karta hai (ya bohot paas hai), to bina dekhe pata chal jayega")]
+    public float hearingRadius = 5f;
+    [Tooltip("Deewarein jo vision block karti hain. Default aur kuch select karein.")]
+    public LayerMask obstacleMask;
 
     [Header("Combat Stats")]
-    public float attackCooldown = 1.5f;
+    public float attackRange = 2.5f;
+    public float attackCooldown = 2.0f;
+    [Tooltip("Attack karne se pehle kitna time wait karega (Telegraphing)")]
+    public float attackAnticipationTime = 0.5f;
     private float lastAttackTime;
+    
     public int maxHealth = 1000;
     private int currentHealth;
     public Slider healthBarSlider;
 
     private NavMeshAgent agent;
-    private bool isPlayerInArena = false; // Check karne ke liye ki player arena me trap ho chuka hai ya nahi
+    private bool isPlayerInArena = false;
+    private bool playerSpotted = false;
 
     private float footstepTimer;
-    private bool hasRoared = false;
 
     [Header("Animation")]
     public Animator animator;
+    
+    // Smooth Blend targets
+    private float currentAnimSpeed = 0f;
 
     // Procedural Arena
     private GameObject proceduralArena;
@@ -41,15 +54,12 @@ public class EnemyAi : MonoBehaviour
 
     void Start()
     {
-        maxHealth = 1000; // Forcefully set to 1000 taaki Inspector ki purani value (100) overwrite ho jaye
+        maxHealth = 1000; 
         agent = GetComponent<NavMeshAgent>();
         currentHealth = maxHealth;
         
-        // Agar slider assign nahi kiya inspector me to khud dhundh lega
         if (healthBarSlider == null)
-        {
             healthBarSlider = GetComponentInChildren<Slider>();
-        }
 
         if (healthBarSlider != null)
         {
@@ -57,58 +67,31 @@ public class EnemyAi : MonoBehaviour
             healthBarSlider.value = currentHealth;
         }
 
-        // 1. Animator dhundna
-        animator = GetComponent<Animator>(); // Pehle khud ke upar check karein
-        if (animator == null) 
-        {
-            animator = GetComponentInChildren<Animator>(); // Agar khud me nahi hai to child me check karein
-        }
+        SetupAnimator();
 
-        // Apply Root Motion ko false kar diya taaki Agent aur Animation me conflict na ho
-        if (animator != null)
-        {
-            animator.applyRootMotion = false;
-
-            if (!animator.enabled) animator.enabled = true; // Auto-enable
-
-            // Agar Controller assign nahi hai to script khud assign kar legi
-            if (animator.runtimeAnimatorController == null)
-            {
-#if UNITY_EDITOR
-                RuntimeAnimatorController controller = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Animator/Enemy.controller");
-                if (controller != null)
-                {
-                    animator.runtimeAnimatorController = controller;
-                    Debug.Log("<color=green><b>EnemyAi ne automatically Animator Controller assign kar diya hai!</b></color>");
-                }
-#endif
-            }
-
-            if (animator.avatar == null)
-            {
-                Debug.LogError("<color=red><b>CRITICAL ERROR: Is Enemy ke Animator me 'AVATAR' missing hai! Iski wajah se ye bina animation ke ghisat (slide) ke chalega. Kripya Inspector me Animator component me Avatar daalein!</b></color>");
-            }
-        }
-        else
-        {
-            Debug.LogError("Is enemy me Animator component hi nahi hai! Please ek Animator add karein: " + gameObject.name);
-        }
-
-        currentHealth = maxHealth;
-
-        // Player agar assign nahi kiya inspector me to tag se dhundhega
         if (player == null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-            if (playerObj != null)
-                player = playerObj.transform;
+            if (playerObj != null) player = playerObj.transform;
         }
 
-        // Patrol start karna point A se
         currentPatrolTarget = pointA;
-        if (currentPatrolTarget != null)
+        SafeSetDestination(currentPatrolTarget != null ? currentPatrolTarget.position : transform.position);
+    }
+
+    private void SetupAnimator()
+    {
+        animator = GetComponent<Animator>(); 
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+
+        if (animator != null)
         {
-            agent.SetDestination(currentPatrolTarget.position);
+            animator.applyRootMotion = false;
+            if (!animator.enabled) animator.enabled = true;
+        }
+        else
+        {
+            Debug.LogError("Is enemy me Animator component nahi hai!");
         }
     }
 
@@ -116,86 +99,114 @@ public class EnemyAi : MonoBehaviour
     {
         if (isDead || player == null || currentHealth <= 0) return;
 
+        CheckLineOfSight(); // Naya Vision system
+
         float distanceToPlayer = Vector3.Distance(transform.position, player.position);
 
-        // Agar player trigger area me aa gaya pehli baar, tab use trap karna hai
-        if (!isPlayerInArena && distanceToPlayer <= triggerRadius)
+        if (playerSpotted && !isPlayerInArena)
         {
             isPlayerInArena = true;
-            hasRoared = true;
-            SpawnProceduralArena(); // Automatically ek gol (ring) deewar banayega
+            SpawnProceduralArena(); 
         }
 
-        // State change logic
-        if (distanceToPlayer <= attackRange)
+        // Logic runs only if not in middle of attack animation or hit reaction
+        if (currentState != EnemyState.Hit && currentState != EnemyState.Attacking && currentState != EnemyState.Telegraphing)
         {
-            currentState = EnemyState.Attacking;
-        }
-        else if (distanceToPlayer <= triggerRadius)
-        {
-            currentState = EnemyState.Chasing;
-        }
-        else
-        {
-            currentState = EnemyState.Patrolling;
-            hasRoared = false; // Reset roar
-        }
-
-        // Footsteps logic
-        if (agent.velocity.magnitude > 0.1f)
-        {
-            footstepTimer -= Time.deltaTime;
-            if (footstepTimer <= 0f)
+            if (playerSpotted && distanceToPlayer <= attackRange)
             {
-                footstepTimer = 0.4f; // Chase running speed
+                if (Time.time >= lastAttackTime + attackCooldown)
+                {
+                    StartCoroutine(TelegraphAndAttack());
+                }
+                else
+                {
+                    // Cooldown me paas hai to bas ghoorega (Face player)
+                    FaceTarget(player.position);
+                    currentState = EnemyState.Chasing; // Keeps him alert
+                }
+            }
+            else if (playerSpotted)
+            {
+                currentState = EnemyState.Chasing;
+            }
+            else
+            {
+                currentState = EnemyState.Patrolling;
             }
         }
 
-        // 100% Reliable Animation logic (State-based)
-        if (animator != null)
-        {
-            float targetSpeed = 0f;
-            bool isAlert = false;
-            
-            if (currentState == EnemyState.Patrolling)
-            {
-                targetSpeed = 0.25f; // Aapke Blend Tree ke mutabiq Walk = 0.25
-                isAlert = true; 
-                agent.speed = 3.5f; // Physical Walk Speed badhaya
-                animator.speed = 1.8f; // Walk animation aur tezi se chalegi
-                lastAttackTime = 0f; // Patrol karte time cooldown reset kar do taaki player dikhte hi maare
-            }
-            else if (currentState == EnemyState.Chasing)
-            {
-                targetSpeed = 1.0f; // Pehle 0.5 tha, ab 1.0 kar diya taaki full speed Run animation chale
-                isAlert = true; 
-                agent.speed = 8.5f; // Physical Run Speed badhaya
-                animator.speed = 2.0f; // Run animation bohot tezi se chalegi
-            }
-            else if (currentState == EnemyState.Attacking)
-            {
-                targetSpeed = 0f; 
-                isAlert = true;
-                agent.speed = 0f; 
-                animator.speed = 1.5f; // Attack animation fast chalegi taaki turant hit kare
-            }
+        UpdateMovementAndAnimation();
+    }
 
-            animator.SetFloat("Speed", targetSpeed);
-            animator.SetBool("IsAlert", isAlert);
+    // --- VISION SYSTEM (AAA Style) ---
+    void CheckLineOfSight()
+    {
+        if (playerSpotted) return; // Ek baar dekh liya to chhorega nahi (arena mode)
+
+        float distance = Vector3.Distance(transform.position, player.position);
+
+        // 1. Hearing (Bahut paas hai to sun lega)
+        if (distance <= hearingRadius)
+        {
+            playerSpotted = true;
+            return;
         }
 
-        // Action perform based on state
+        // 2. Vision (Aage ki taraf dekhega)
+        if (distance <= viewRadius)
+        {
+            Vector3 dirToPlayer = (player.position - transform.position).normalized;
+            if (Vector3.Angle(transform.forward, dirToPlayer) < viewAngle / 2f)
+            {
+                // Raycast se check karo ki beech me koi deewar to nahi
+                if (!Physics.Raycast(transform.position + Vector3.up, dirToPlayer, distance, obstacleMask))
+                {
+                    playerSpotted = true;
+                }
+            }
+        }
+    }
+
+    void UpdateMovementAndAnimation()
+    {
+        float targetAnimSpeed = 0f;
+        bool isAlert = false;
+        float targetAgentSpeed = 0f;
+
         switch (currentState)
         {
             case EnemyState.Patrolling:
+                targetAnimSpeed = 0.25f; 
+                targetAgentSpeed = 3.5f;
                 Patrol();
                 break;
             case EnemyState.Chasing:
+                targetAnimSpeed = 1.0f;
+                targetAgentSpeed = 8.5f;
+                isAlert = true;
                 ChasePlayer();
                 break;
+            case EnemyState.Telegraphing:
             case EnemyState.Attacking:
-                AttackPlayer();
+            case EnemyState.Hit:
+                targetAnimSpeed = 0f;
+                targetAgentSpeed = 0f;
+                isAlert = true;
+                SafeStopAgent(true);
                 break;
+        }
+
+        // Smooth Interpolation (Weight/Heaviness feel)
+        if (agent != null && agent.isOnNavMesh)
+        {
+            agent.speed = Mathf.Lerp(agent.speed, targetAgentSpeed, Time.deltaTime * 5f);
+        }
+
+        if (animator != null)
+        {
+            currentAnimSpeed = Mathf.Lerp(currentAnimSpeed, targetAnimSpeed, Time.deltaTime * 5f);
+            animator.SetFloat("Speed", currentAnimSpeed);
+            animator.SetBool("IsAlert", isAlert);
         }
     }
 
@@ -203,79 +214,121 @@ public class EnemyAi : MonoBehaviour
     {
         if (pointA == null || pointB == null) return;
 
-        agent.isStopped = false; // Move hone do
+        SafeStopAgent(false);
 
-        // Check agar destination (Point A ya B) ke paas pahuch gaya hai
-        if (agent.remainingDistance <= agent.stoppingDistance && !agent.pathPending)
+        if (agent != null && agent.isOnNavMesh && agent.remainingDistance <= agent.stoppingDistance && !agent.pathPending)
         {
-            // Target change karo (Agar A tha to B kar do, B tha to A kar do)
             currentPatrolTarget = (currentPatrolTarget == pointA) ? pointB : pointA;
-            agent.SetDestination(currentPatrolTarget.position);
+            SafeSetDestination(currentPatrolTarget.position);
         }
     }
 
     void ChasePlayer()
     {
-        agent.isStopped = false;
-        agent.SetDestination(player.position);
-    }
-
-    void AttackPlayer()
-    {
-        agent.isStopped = true; // Attack ke time enemy ruk jayega
-
-        // Player ki taraf dekhne ke liye (Rotation)
-        Vector3 direction = (player.position - transform.position).normalized;
-        direction.y = 0; 
-        transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(direction), Time.deltaTime * 5f);
-
-        // Cooldown check karke attack karna
-        if (Time.time >= lastAttackTime + attackCooldown)
-        {
-            if (animator != null)
-            {
-                // CrossFade time bohot kam kar diya (0.05) taaki ekdum se attack kare
-                animator.CrossFade("Attack1", 0.05f); 
-            }
-            
-            Debug.Log("Enemy Attacking Player!");
-            StartCoroutine(DealDamageToPlayer()); // Damage ke liye
-            lastAttackTime = Time.time;
-        }
-    }
-
-    private System.Collections.IEnumerator DealDamageToPlayer()
-    {
-        yield return new WaitForSeconds(0.4f); // Animation me jab haath (sword) girti hai tab tak ka wait
-        
-        if (isDead || player == null) yield break;
-
+        // Attack range me nahi hai, to move karo
         float distance = Vector3.Distance(transform.position, player.position);
-        
-        // Agar player thoda aas-paas hi hai to damage lag jayega
-        if (distance <= attackRange + 1.5f)
+        if (distance > attackRange * 0.8f) // thoda buffer
         {
-            PlayerController pc = player.GetComponent<PlayerController>();
-            if (pc != null)
-            {
-                pc.TakeDamage(100f);
-                Debug.Log("<color=red>Enemy ne player par attack kiya aur 100 health kam kar di!</color>");
-            }
+            SafeStopAgent(false);
+            SafeSetDestination(player.position);
+        }
+        else
+        {
+            SafeStopAgent(true);
+            FaceTarget(player.position); // Ghoom ke player ki taraf dekhega
         }
     }
 
-    // Is function ko call karein jab player enemy ko damage de
+    // --- TELEGRAPHING & ATTACK (AAA Combat) ---
+    private IEnumerator TelegraphAndAttack()
+    {
+        currentState = EnemyState.Telegraphing;
+        SafeStopAgent(true);
+
+        // Telegraph Phase (Winding up)
+        float t = 0;
+        while (t < attackAnticipationTime)
+        {
+            if (isDead) yield break;
+            FaceTarget(player.position); // Player ko ghoorta rahega attack karne se theek pehle
+            t += Time.deltaTime;
+            yield return null;
+        }
+
+        // Commit to attack (Rotation lock ho jayegi)
+        currentState = EnemyState.Attacking;
+
+        if (animator != null)
+        {
+            animator.speed = 1.2f; 
+            animator.CrossFade("Attack1", 0.15f); // Smooth crossfade instead of snap
+        }
+        
+        // Wait for sword to drop
+        yield return new WaitForSeconds(0.4f);
+        
+        if (!isDead && player != null)
+        {
+            float distance = Vector3.Distance(transform.position, player.position);
+            // Sirf aage wale hit honge, peeche bhag gaya to damage nahi lagega
+            Vector3 dirToPlayer = (player.position - transform.position).normalized;
+            float angleToPlayer = Vector3.Angle(transform.forward, dirToPlayer);
+
+            if (distance <= attackRange + 1f && angleToPlayer < 90f) // Fair hitbox
+            {
+                PlayerController pc = player.GetComponent<PlayerController>();
+                if (pc != null) pc.TakeDamage(100f);
+            }
+        }
+
+        // Wait for attack animation to finish
+        yield return new WaitForSeconds(0.8f);
+
+        lastAttackTime = Time.time;
+
+        if (!isDead && currentState != EnemyState.Hit)
+        {
+            currentState = EnemyState.Chasing; // Attack ke baad wapas chase/decide karega
+        }
+    }
+
+    void FaceTarget(Vector3 targetPos)
+    {
+        Vector3 direction = (targetPos - transform.position).normalized;
+        direction.y = 0;
+        if (direction != Vector3.zero)
+        {
+            Quaternion lookRotation = Quaternion.LookRotation(direction);
+            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+        }
+    }
+
+    // --- SAFE NAVMESH METHODS (Fixes Errors) ---
+    void SafeStopAgent(bool stop)
+    {
+        if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = stop;
+        }
+    }
+
+    void SafeSetDestination(Vector3 dest)
+    {
+        if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+        {
+            agent.SetDestination(dest);
+        }
+    }
+
+    // --- HIT & DEATH ---
     public void TakeDamage(int damageAmount)
     {
         if (isDead) return;
 
         currentHealth -= damageAmount;
+        playerSpotted = true; // Koi dur se mare to bhi dekh lega
         
-        // UI Update karein
-        if (healthBarSlider != null)
-        {
-            healthBarSlider.value = currentHealth;
-        }
+        if (healthBarSlider != null) healthBarSlider.value = currentHealth;
         
         if (currentHealth <= 0)
         {
@@ -283,91 +336,72 @@ public class EnemyAi : MonoBehaviour
         }
         else
         {
+            // Attack cancel if hit
+            StopAllCoroutines();
             StartCoroutine(HitRecovery());
         }
     }
 
-    private System.Collections.IEnumerator HitRecovery()
+    private IEnumerator HitRecovery()
     {
-        currentState = EnemyState.Hit; // State change kar diya taaki Update me normal logic na chale
-        agent.isStopped = true;
+        currentState = EnemyState.Hit;
+        SafeStopAgent(true);
         
         if (animator != null)
         {
             animator.speed = 1.0f;
-            // CrossFade "Hit" taaki hit ka reaction properly aaye
-            animator.CrossFade("Hit", 0.05f); 
+            animator.CrossFade("Hit", 0.1f); 
         }
 
-        yield return new WaitForSeconds(0.6f); // 0.6 second ka flinch / stun
+        yield return new WaitForSeconds(0.6f);
         
         if (!isDead)
         {
-            agent.isStopped = false;
-            currentState = EnemyState.Chasing; // Wapas chase karne lag jayega
+            currentState = EnemyState.Chasing;
         }
     }
 
     void Die()
     {
         isDead = true;
-        Debug.Log("Enemy Died!");
+        StopAllCoroutines();
         
-        // Death Animation
         if (animator != null)
         {
             animator.speed = 1.0f;
             animator.CrossFade("Death", 0.2f);
         }
         
-        // Enemy mar gaya to Arena (Ring) tod do taaki player bahar ja sake
-        if (proceduralArena != null)
-        {
-            Destroy(proceduralArena);
-        }
+        if (proceduralArena != null) Destroy(proceduralArena);
         
-        if (agent.isOnNavMesh)
-        {
-            agent.isStopped = true;
-        }
-        agent.enabled = false; // NavMeshAgent ko disable kar do taaki gravity/collision issues na aaye
+        SafeStopAgent(true);
+        if (agent != null) agent.enabled = false; 
         
-        // Arena khatam ho raha hai to lamp wapas chalu kar do
         if (player != null)
         {
             PlayerController pc = player.GetComponent<PlayerController>();
             if (pc != null) pc.SetLampFreeze(false);
         }
         
-        // GetComponent<Collider>().enabled = false; // Isko hataya taaki enemy floor ke niche na gire
-        // this.enabled = false; // Script disable karne se Coroutines bhi stop ho jate hain, to isko bhi hata diya
-        
-        Destroy(gameObject, 5f); // 5 second baad body gayab
+        Destroy(gameObject, 5f); 
     }
 
-    // Apne hisaab se Arena (Wall) banane ka kamaal ka function!
     void SpawnProceduralArena()
     {
         if (proceduralArena != null) return;
-
-        // Player ka lamp freeze kardo taaki fight ke beech me oil khatam na ho
         if (player != null)
         {
             PlayerController pc = player.GetComponent<PlayerController>();
             if (pc != null) pc.SetLampFreeze(true);
         }
 
-        // Player aur Enemy ke beech ka center nikal kar arena banayenge
         Vector3 centerPosition = (transform.position + player.position) / 2f;
-        centerPosition.y = transform.position.y; // Zameen par rakho
-
+        centerPosition.y = transform.position.y; 
         proceduralArena = new GameObject("Epic_Arena_Ring_" + gameObject.name);
         proceduralArena.transform.position = centerPosition;
 
-        // Ring thodi badi honi chahiye (trigger radius ke barabar)
-        float arenaRadius = triggerRadius;
-
-        // 1. Zameen par ek laal rang ka visual circle (LineRenderer) banayenge
+        float arenaRadius = viewRadius > 15f ? 15f : viewRadius; // Thoda balance
+        
         LineRenderer line = proceduralArena.AddComponent<LineRenderer>();
         line.useWorldSpace = false;
         line.startWidth = 0.4f;
@@ -376,7 +410,7 @@ public class EnemyAi : MonoBehaviour
         line.loop = true;
         
         Material redMat = new Material(Shader.Find("Hidden/Internal-Colored"));
-        redMat.color = new Color(1f, 0f, 0f, 0.7f); // Red Ring
+        redMat.color = new Color(1f, 0f, 0f, 0.7f);
         line.material = redMat;
 
         float angle = 0f;
@@ -384,42 +418,47 @@ public class EnemyAi : MonoBehaviour
         {
             float x = Mathf.Sin(Mathf.Deg2Rad * angle) * arenaRadius;
             float z = Mathf.Cos(Mathf.Deg2Rad * angle) * arenaRadius;
-            line.SetPosition(i, new Vector3(x, 0.2f, z)); // Zameen se thoda upar
+            line.SetPosition(i, new Vector3(x, 0.2f, z)); 
             angle += (360f / 50f);
         }
 
-        // 2. Invisible physical Deewarein banayenge taaki player bahar na ja sake
-        int segments = 24; // 24 boxes mil kar gol deewar banayenge
+        int segments = 24; 
         angle = 0f;
         for (int i = 0; i < segments; i++)
         {
             GameObject wall = new GameObject("InvisibleWallSegment");
             wall.transform.SetParent(proceduralArena.transform);
-            
             float x = Mathf.Sin(Mathf.Deg2Rad * angle) * arenaRadius;
             float z = Mathf.Cos(Mathf.Deg2Rad * angle) * arenaRadius;
-            
-            wall.transform.localPosition = new Vector3(x, 10f, z); // Height 10f
-            wall.transform.LookAt(proceduralArena.transform); // Center ki taraf dekhe
-            
+            wall.transform.localPosition = new Vector3(x, 10f, z); 
+            wall.transform.LookAt(proceduralArena.transform); 
             BoxCollider box = wall.AddComponent<BoxCollider>();
             float width = (arenaRadius * 2f * Mathf.PI) / segments;
-            box.size = new Vector3(width + 1f, 25f, 1f); // Moti aur lambi deewar
-            
+            box.size = new Vector3(width + 1f, 25f, 1f); 
             angle += (360f / segments);
         }
-        
-        Debug.Log("Player trapped in Arena!");
     }
 
-    // Unity Editor me ranges dekhne ke liye (Gizmos)
+    // AAA Visual Debugging
     private void OnDrawGizmosSelected()
     {
-        // Trigger Range (Yellow)
+        // View Radius
+        Gizmos.color = Color.white;
+        Gizmos.DrawWireSphere(transform.position, viewRadius);
+        
+        // Hearing Radius
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, triggerRadius);
+        Gizmos.DrawWireSphere(transform.position, hearingRadius);
 
-        // Attack Range (Red)
+        // Vision Cone (Green lines)
+        Gizmos.color = Color.green;
+        Vector3 forward = transform.forward;
+        Vector3 leftBoundary = Quaternion.Euler(0, -viewAngle / 2f, 0) * forward;
+        Vector3 rightBoundary = Quaternion.Euler(0, viewAngle / 2f, 0) * forward;
+        Gizmos.DrawLine(transform.position, transform.position + leftBoundary * viewRadius);
+        Gizmos.DrawLine(transform.position, transform.position + rightBoundary * viewRadius);
+
+        // Attack Range
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
     }

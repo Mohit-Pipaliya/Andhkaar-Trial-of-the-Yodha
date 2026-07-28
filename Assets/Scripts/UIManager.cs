@@ -9,6 +9,15 @@ public class UIManager : MonoBehaviour
 {
     // === Game State for PlayerController ===
     public static bool isGameActive = false;
+    private static bool hasStartedOnce = false;
+
+#if UNITY_EDITOR
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void Init()
+    {
+        hasStartedOnce = false;
+    }
+#endif
 
     [Header("--- UI Panels ---")]
     public GameObject loadingPanel;
@@ -72,8 +81,6 @@ public class UIManager : MonoBehaviour
 
     private void Start()
     {
-        isGameActive = false; // Game starts locked in loading/menu
-
         // Force hide all panels first instantly
         HidePanel(mainMenuPanel, false);
         HidePanel(gamePlayPanel, false);
@@ -83,8 +90,7 @@ public class UIManager : MonoBehaviour
         HidePanel(damagePanel, false);
         HidePanel(finishPanel, false);
         HidePanel(gameOverPanel, false);
-
-        ShowPanel(loadingPanel, false);
+        HidePanel(loadingPanel, false);
 
         // Sliders setup
         PlayerController pc = FindFirstObjectByType<PlayerController>();
@@ -107,7 +113,24 @@ public class UIManager : MonoBehaviour
             volumeSlider.value = AudioListener.volume;
         }
 
-        StartCoroutine(LoadingRoutine());
+        if (!hasStartedOnce)
+        {
+            isGameActive = false; // Game starts locked in loading/menu
+            ShowPanel(loadingPanel, false);
+            StartCoroutine(LoadingRoutine());
+            hasStartedOnce = true;
+        }
+        else
+        {
+            // Skip loading and main menu, go straight to gameplay
+            ShowPanel(gamePlayPanel, false);
+            Time.timeScale = 1f; 
+            isGamePaused = false;
+            isGameActive = true; // Unlock player input
+            
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
     }
 
     private void Update()

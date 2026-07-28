@@ -253,6 +253,7 @@ public class PlayerController : MonoBehaviour
     private InputAction dropWeaponAction;
     private InputAction dropLampAction;
     private InputAction specialAction;
+    private InputAction prayAction;
 
     // ── Weapon Inputs ──────────────────────────────────────────
     private InputAction equipNoneAction;
@@ -320,6 +321,7 @@ public class PlayerController : MonoBehaviour
         dropLampAction       = new InputAction("DropLamp",       type: InputActionType.Button, binding: "<Keyboard>/l");
         lookAction           = new InputAction("Look",           binding: "<Pointer>/delta");
         specialAction        = new InputAction("Special",        type: InputActionType.Button, binding: "<Keyboard>/m");
+        prayAction           = new InputAction("Pray",           type: InputActionType.Button, binding: "<Keyboard>/p");
 
         equipNoneAction   = new InputAction("EquipNone",   type: InputActionType.Button, binding: "<Keyboard>/1");
         equipSword1Action = new InputAction("EquipSword1", type: InputActionType.Button, binding: "<Keyboard>/2");
@@ -398,8 +400,10 @@ public class PlayerController : MonoBehaviour
         if (animator == null) Debug.LogWarning("PlayerController: Animator is missing!");
         if (Camera.main == null) Debug.LogWarning("PlayerController: Main Camera is missing!");
 
-        currentHealth = maxHealth; // Setup health
-
+        currentHealth = maxHealth; // Setup health default
+        
+        // --- NEW: Load Game State across levels ---
+        GameSaveManager.LoadGameState(this);
         if (animator != null)
             animator.applyRootMotion = false;
 
@@ -812,6 +816,16 @@ public class PlayerController : MonoBehaviour
             UpdateWeaponState(WeaponType.Sword1);
         if (equipSword2Action.triggered && hasSword2)
             UpdateWeaponState(WeaponType.Sword2);
+
+        // ─── PRAY ACTION ───────────────────────────────────────────
+        if (prayAction.triggered && groundedNow && !isSliding)
+        {
+            if (!isAttacking && !isSpecialActionPlaying && currentHealth > 0 && IsInPrayTrigger)
+            {
+                UpdateWeaponState(WeaponType.None); // Hath khali karo (weapons drop)
+                animator.SetTrigger("Pray");
+            }
+        }
 
         // ─── 12. SPECIAL ACTION (3-step sword-put flow) ─────────────────────────
         if (specialAction.triggered && groundedNow && !isSliding)
@@ -1427,7 +1441,7 @@ public class PlayerController : MonoBehaviour
         UpdateWeaponState(WeaponType.None);
     }
 
-    private void UpdateWeaponState(WeaponType newWeapon)
+    public void UpdateWeaponState(WeaponType newWeapon)
     {
         if (currentWeapon != newWeapon)
         {
