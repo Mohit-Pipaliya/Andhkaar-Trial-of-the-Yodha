@@ -95,29 +95,45 @@ public class PlayerAutoSetup : EditorWindow
 
         for (int i = 0; i < 3; i++)
         {
+            string num = (i + 1).ToString();
+            
             if (player.specialObjects[i] == null)
             {
-                GameObject obj = GameObject.Find($"Special Object {i+1}");
-                if (obj == null) obj = GameObject.Find($"Stand for Special Object {i+1}");
+                GameObject obj = FindQuestObject(
+                    new string[] { $"Special Object {num}", $"Stand for Special Object {num}", $"Stand forSpecial Object {num}", $"Stand For special Object  gate {num}" },
+                    new string[] { "special", "object", num },
+                    null
+                );
                 if (obj != null) { player.specialObjects[i] = obj; assignedCount++; }
             }
 
             if (player.prayTriggers[i] == null)
             {
-                GameObject obj = GameObject.Find($"Pray Trigger {i+1}");
+                GameObject obj = FindQuestObject(
+                    new string[] { $"Pray Trigger {num}", $"PrayTrigger {num}", $"PrayTrigger{num}" },
+                    new string[] { "pray", "trigger", num },
+                    null
+                );
                 if (obj != null) { player.prayTriggers[i] = obj.transform; assignedCount++; }
             }
 
             if (player.placeTriggers[i] == null)
             {
-                GameObject obj = GameObject.Find($"Place Trigger {i+1}");
+                GameObject obj = FindQuestObject(
+                    new string[] { $"Place Trigger {num}", $"PlaceTrigger {num}", $"PlaceTrigger{num}" },
+                    new string[] { "place", "trigger", num },
+                    null
+                );
                 if (obj != null) { player.placeTriggers[i] = obj.transform; assignedCount++; }
             }
 
             if (player.gates[i] == null)
             {
-                GameObject obj = GameObject.Find($"Gate {i+1}");
-                if (obj == null) obj = GameObject.Find($"Gate{i+1}");
+                GameObject obj = FindQuestObject(
+                    new string[] { $"Gate {num}", $"Gate{num}", $"Level {num} Gate" },
+                    new string[] { "gate", num },
+                    new string[] { "outer" } // exclude "Outer gate"
+                );
                 if (obj != null) { player.gates[i] = obj; assignedCount++; }
             }
         }
@@ -161,6 +177,57 @@ public class PlayerAutoSetup : EditorWindow
             if (result != null)
                 return result;
         }
+        return null;
+    }
+
+    private static GameObject FindQuestObject(string[] exactNames, string[] keywords, string[] excludeKeywords)
+    {
+        GameObject[] allObjects = Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        
+        // 1. Try Exact match (case insensitive)
+        foreach (GameObject obj in allObjects)
+        {
+            foreach (string name in exactNames)
+            {
+                if (obj.name.Equals(name, System.StringComparison.OrdinalIgnoreCase))
+                    return obj;
+            }
+        }
+
+        // 2. Try Keyword match
+        foreach (GameObject obj in allObjects)
+        {
+            string lowerName = obj.name.ToLower();
+            
+            // Check exclusions
+            bool excluded = false;
+            if (excludeKeywords != null)
+            {
+                foreach (string ex in excludeKeywords)
+                {
+                    if (lowerName.Contains(ex.ToLower()))
+                    {
+                        excluded = true;
+                        break;
+                    }
+                }
+            }
+            if (excluded) continue;
+
+            // Check keywords
+            bool match = true;
+            string nameNoSpaces = lowerName.Replace(" ", "").Replace("_", "");
+            foreach (string kw in keywords)
+            {
+                if (!nameNoSpaces.Contains(kw.ToLower().Replace(" ", "")))
+                {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) return obj;
+        }
+
         return null;
     }
 }

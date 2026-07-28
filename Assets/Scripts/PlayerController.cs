@@ -429,11 +429,24 @@ public class PlayerController : MonoBehaviour
             
         UpdateWeaponState(WeaponType.None);
 
-        // ── UI Prompts shuru mein hide karo ──
-        if (pressOUI != null)    pressOUI.SetActive(false);
-        if (pressEUI != null)    pressEUI.SetActive(false);
-        if (pressMUI != null)    pressMUI.SetActive(false);
-        if (pressPut1UI != null) pressPut1UI.SetActive(false); // IMPORTANT: shuru mein chhupa ke rakho
+        // ── UI Prompts shuru mein hide karo (sabhi bacchon ko chupa do) ──
+        if (pressOUI != null)
+        {
+            Transform uiParent = pressOUI.transform.parent;
+            if (uiParent != null)
+            {
+                foreach (Transform child in uiParent)
+                {
+                    child.gameObject.SetActive(false);
+                }
+            }
+        }
+        else
+        {
+            if (pressEUI != null)    pressEUI.SetActive(false);
+            if (pressMUI != null)    pressMUI.SetActive(false);
+            if (pressPut1UI != null) pressPut1UI.SetActive(false);
+        }
 
         // ── Derive physics values from designer-friendly inputs ──
         // Using kinematic equations:
@@ -443,6 +456,14 @@ public class PlayerController : MonoBehaviour
 
         FindSceneDirectionalLight();
         ApplyEnvironmentLighting();
+
+        // --- SAFE FALLBACK: If UIManager is missing in the scene, unlock player ---
+        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        if (uiManager == null)
+        {
+            Debug.LogWarning("PlayerController: UIManager scene mein nahi mila! Input by default unlock kar raha hu.");
+            UIManager.isGameActive = true;
+        }
     }
 
     // Call this if you change jumpHeight or timeToApex at runtime
