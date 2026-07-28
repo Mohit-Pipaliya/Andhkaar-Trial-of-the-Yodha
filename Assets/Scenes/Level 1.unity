@@ -7605,7 +7605,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 382997477}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a5ac11cc976e418e8d13136b07e1f52, type: 3}
   m_Name: 
@@ -7628,7 +7628,7 @@ MonoBehaviour:
   m_OverrideVoxelSize: 0
   m_VoxelSize: 0.16666667
   m_MinRegionArea: 2
-  m_NavMeshData: {fileID: 23800000, guid: aa103be859dda4d438a176919f864190, type: 2}
+  m_NavMeshData: {fileID: 23800000, guid: a0f1c1b1e65f942aba8072e48e34014b, type: 2}
   m_BuildHeightMesh: 0
 --- !u!4 &382997479
 Transform:
@@ -12019,28 +12019,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 852091930950884441, guid: 7ef027989b7c946f396b90284dd987db, type: 3}
   m_PrefabInstance: {fileID: 965274698}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &965310226 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 3583075885366624531, guid: 5ed44093071f54320882842452023ae7, type: 3}
-  m_PrefabInstance: {fileID: 8052591948815739737}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &965310229
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 965310226}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aa3c1e8005c494967845d5c828d6a245, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LevelTriggerArea
-  notificationPanel: {fileID: 872911050}
-  notificationText: {fileID: 1723825887}
-  messageToShow: Level 1 Complete!
-  showDuration: 3
-  updatedLevelText: 'Level : 2'
 --- !u!4 &966468223 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6224927381381571426, guid: 55122110827b34eeda81d0961b0880cf, type: 3}
@@ -31255,46 +31233,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 707696271}
     m_Modifications:
-    - target: {fileID: 2245720979585980146, guid: 5ed44093071f54320882842452023ae7, type: 3}
-      propertyPath: m_Size.x
-      value: 0.057893485
-      objectReference: {fileID: 0}
-    - target: {fileID: 2245720979585980146, guid: 5ed44093071f54320882842452023ae7, type: 3}
-      propertyPath: m_Size.y
-      value: 0.055510998
-      objectReference: {fileID: 0}
-    - target: {fileID: 2245720979585980146, guid: 5ed44093071f54320882842452023ae7, type: 3}
-      propertyPath: m_Size.z
-      value: 0.079062186
-      objectReference: {fileID: 0}
-    - target: {fileID: 2245720979585980146, guid: 5ed44093071f54320882842452023ae7, type: 3}
-      propertyPath: m_Center.x
-      value: 0.013887577
-      objectReference: {fileID: 0}
-    - target: {fileID: 2245720979585980146, guid: 5ed44093071f54320882842452023ae7, type: 3}
-      propertyPath: m_Center.y
-      value: 0.09627973
-      objectReference: {fileID: 0}
-    - target: {fileID: 2245720979585980146, guid: 5ed44093071f54320882842452023ae7, type: 3}
-      propertyPath: m_Center.z
-      value: -0.020407863
-      objectReference: {fileID: 0}
-    - target: {fileID: 5719972701350454284, guid: 5ed44093071f54320882842452023ae7, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -0.498
-      objectReference: {fileID: 0}
-    - target: {fileID: 8080463279346000172, guid: 5ed44093071f54320882842452023ae7, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 100
-      objectReference: {fileID: 0}
-    - target: {fileID: 8080463279346000172, guid: 5ed44093071f54320882842452023ae7, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 100
-      objectReference: {fileID: 0}
-    - target: {fileID: 8080463279346000172, guid: 5ed44093071f54320882842452023ae7, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 100
-      objectReference: {fileID: 0}
+    - target: {fileID: 7683406351806127773, guid: 5ed44093071f54320882842452023ae7, type: 3}
+      propertyPath: notificationText
+      value: 
+      objectReference: {fileID: 1723825887}
+    - target: {fileID: 7683406351806127773, guid: 5ed44093071f54320882842452023ae7, type: 3}
+      propertyPath: notificationPanel
+      value: 
+      objectReference: {fileID: 872911050}
     - target: {fileID: 8080463279346000172, guid: 5ed44093071f54320882842452023ae7, type: 3}
       propertyPath: m_LocalPosition.x
       value: 253
@@ -31342,10 +31288,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 3583075885366624531, guid: 5ed44093071f54320882842452023ae7, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 965310229}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 5ed44093071f54320882842452023ae7, type: 3}
 --- !u!4 &8052591948815739738 stripped
 Transform:
