@@ -456,18 +456,6 @@ PrefabInstance:
       value: Zoomer light (2)
       objectReference: {fileID: 0}
     - target: {fileID: 7683032749578280027, guid: 81e87ac1f9a834d3c8b5a6163b3f50a0, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 40
-      objectReference: {fileID: 0}
-    - target: {fileID: 7683032749578280027, guid: 81e87ac1f9a834d3c8b5a6163b3f50a0, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 40
-      objectReference: {fileID: 0}
-    - target: {fileID: 7683032749578280027, guid: 81e87ac1f9a834d3c8b5a6163b3f50a0, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 40
-      objectReference: {fileID: 0}
-    - target: {fileID: 7683032749578280027, guid: 81e87ac1f9a834d3c8b5a6163b3f50a0, type: 3}
       propertyPath: m_LocalPosition.x
       value: 50.49999
       objectReference: {fileID: 0}
@@ -506,10 +494,6 @@ PrefabInstance:
     - target: {fileID: 7683032749578280027, guid: 81e87ac1f9a834d3c8b5a6163b3f50a0, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7683032749578280027, guid: 81e87ac1f9a834d3c8b5a6163b3f50a0, type: 3}
-      propertyPath: m_ConstrainProportionsScale
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
