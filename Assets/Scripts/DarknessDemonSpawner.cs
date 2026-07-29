@@ -90,7 +90,7 @@ public class DarknessDemonSpawner : MonoBehaviour
             aiNoPatrol.forceChase = true;
         }
 
-        EnemyAi ai = activeDemon.GetComponent<EnemyAi>();
+        DemonAi ai = activeDemon.GetComponent<DemonAi>();
         
         // Jab tak ye demon mar nahi jata, tab tak wait karo aur check karo ki player ne oil to nahi liya
         bool isDemonDead = false;

@@ -37,8 +37,8 @@ public class SwordDamage : MonoBehaviour
         if (Time.time < lastHitTime + hitCooldown) return;
 
         // Check if we hit an enemy
-        EnemyAi enemy = other.GetComponent<EnemyAi>();
-        if (enemy == null) enemy = other.GetComponentInParent<EnemyAi>();
+        DemonAi enemy = other.GetComponent<DemonAi>();
+        if (enemy == null) enemy = other.GetComponentInParent<DemonAi>();
 
         if (enemy != null)
         {
