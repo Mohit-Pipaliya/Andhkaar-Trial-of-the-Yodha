@@ -302,7 +302,11 @@ public class EnemyAiNoPatrol : MonoBehaviour
         if (player != null)
         {
             PlayerController pc = player.GetComponent<PlayerController>();
-            if (pc != null) pc.SetLampFreeze(false);
+            if (pc != null) 
+            {
+                pc.SetLampFreeze(false);
+                pc.SetCombatState(false);
+            }
         }
         
         Destroy(gameObject, 5f); 
@@ -312,11 +316,15 @@ public class EnemyAiNoPatrol : MonoBehaviour
     {
         if (proceduralArena != null) return;
 
-        // Player ka lamp freeze kardo taaki fight ke beech me oil khatam na ho
+        // Player ka lamp freeze aur combat state on kardo taaki fight ke beech me oil khatam na ho
         if (player != null)
         {
             PlayerController pc = player.GetComponent<PlayerController>();
-            if (pc != null) pc.SetLampFreeze(true);
+            if (pc != null) 
+            {
+                pc.SetLampFreeze(true);
+                pc.SetCombatState(true);
+            }
         }
 
         Vector3 centerPosition = (transform.position + player.position) / 2f;

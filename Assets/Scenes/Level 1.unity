@@ -7634,7 +7634,7 @@ MonoBehaviour:
   targetSceneName: Level 2
   destinationPortalID: Gate 2
   player: {fileID: 1086797327}
-  actualPlayerSize: {x: 1000, y: 1000, z: 1000}
+  actualPlayerSize: {x: 2000, y: 2000, z: 2000}
   portalIn: {fileID: 191788251}
   ringPosition: {fileID: 828973525}
   endPoint: {fileID: 828973525}

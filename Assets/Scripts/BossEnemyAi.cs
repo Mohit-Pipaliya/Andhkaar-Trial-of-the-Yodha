@@ -289,7 +289,11 @@ public class BossEnemyAi : MonoBehaviour
         if (player != null)
         {
             PlayerController pc = player.GetComponent<PlayerController>();
-            if (pc != null) pc.SetLampFreeze(false);
+            if (pc != null) 
+            {
+                pc.SetLampFreeze(false);
+                pc.SetCombatState(false);
+            }
         }
         
         Destroy(gameObject, 8f); // Boss body thodi der tak rukegi
@@ -302,7 +306,11 @@ public class BossEnemyAi : MonoBehaviour
         if (player != null)
         {
             PlayerController pc = player.GetComponent<PlayerController>();
-            if (pc != null) pc.SetLampFreeze(true);
+            if (pc != null) 
+            {
+                pc.SetLampFreeze(true);
+                pc.SetCombatState(true);
+            }
         }
 
         Vector3 centerPosition = (transform.position + player.position) / 2f;

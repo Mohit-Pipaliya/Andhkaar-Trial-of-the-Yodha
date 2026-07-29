@@ -83,20 +83,23 @@ public class DemonAi : MonoBehaviour
         }
 
         // 2. State decide karna
-        if (isPlayerTrapped) // Jab trap ho gaya, tabhi chase/attack karega
+        if (currentState != State.Hit)
         {
-            if (distanceToPlayer <= attackRange)
+            if (isPlayerTrapped) // Jab trap ho gaya, tabhi chase/attack karega
             {
-                currentState = State.Attacking;
+                if (distanceToPlayer <= attackRange)
+                {
+                    currentState = State.Attacking;
+                }
+                else
+                {
+                    currentState = State.Chasing;
+                }
             }
             else
             {
-                currentState = State.Chasing;
+                currentState = State.Patrolling;
             }
-        }
-        else
-        {
-            currentState = State.Patrolling;
         }
 
         // 3. Animation and Speed Control
@@ -214,7 +217,15 @@ public class DemonAi : MonoBehaviour
         if (currentHealth > 0)
         {
             // Agar hit hua hai to hit animation play karo
-            if (animator != null) animator.CrossFade("Hit", 0.05f);
+            if (animator != null) 
+            {
+                animator.SetTrigger("Hit");
+                animator.CrossFade("Hit", 0.05f);
+            }
+            
+            // Start Hit routine to pause movement briefly
+            StopCoroutine("HitRoutine");
+            StartCoroutine(HitRoutine());
         }
         else
         {
@@ -222,16 +233,51 @@ public class DemonAi : MonoBehaviour
         }
     }
 
+    private IEnumerator HitRoutine()
+    {
+        currentState = State.Hit;
+        if (agent != null && agent.isOnNavMesh) agent.isStopped = true;
+        
+        yield return new WaitForSeconds(0.6f); // Hit animation time
+        
+        if (!isDead)
+        {
+            currentState = State.Chasing;
+            if (agent != null && agent.isOnNavMesh) agent.isStopped = false;
+        }
+    }
+
     void Die()
     {
+        if (isDead) return;
         isDead = true;
-        agent.isStopped = true;
-        agent.enabled = false;
+        
+        if (agent != null && agent.isOnNavMesh)
+        {
+            agent.isStopped = true;
+            agent.enabled = false;
+        }
 
-        if (animator != null) animator.CrossFade("Death", 0.2f);
+        if (animator != null) 
+        {
+            animator.SetTrigger("Death");
+            animator.SetTrigger("Die");
+            animator.CrossFade("Death", 0.2f);
+        }
 
         // Arena wall tod do taaki player aazad ho jaye
         if (arenaWall != null) Destroy(arenaWall);
+
+        // Fight khatam - player ka lamp state wapas lao
+        if (player != null)
+        {
+            PlayerController pc = player.GetComponent<PlayerController>();
+            if (pc != null) 
+            {
+                pc.SetLampFreeze(false);
+                pc.SetCombatState(false);
+            }
+        }
 
         Destroy(gameObject, 5f); // 5 second baad body gayab
     }
@@ -239,6 +285,17 @@ public class DemonAi : MonoBehaviour
     void CreateArenaWall()
     {
         if (arenaWall != null) return;
+
+        // Player ka lamp freeze aur combat state on kardo
+        if (player != null)
+        {
+            PlayerController pc = player.GetComponent<PlayerController>();
+            if (pc != null) 
+            {
+                pc.SetLampFreeze(true);
+                pc.SetCombatState(true);
+            }
+        }
 
         // Player aur Enemy ke theek beech (center) me arena banega
         Vector3 center = (transform.position + player.position) / 2f;

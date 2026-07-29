@@ -149,6 +149,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("Torch States")]
     public bool hasTorch = false;
+    [HideInInspector] public int activeCombatEngagements = 0;
 
     [Header("Torch — Dual Object Setup")]
     [Tooltip("Player ke haath ka lamp GameObject — Editor mein position set karo, script shuru mein hide kar degi")]
@@ -774,7 +775,7 @@ public class PlayerController : MonoBehaviour
 
         animator.SetBool("IsWalking", isWalkingAnim);
         animator.SetBool("IsRunning", isRunningAnim);
-        animator.SetBool("HasTorch",  hasTorch);
+        animator.SetBool("HasTorch",  hasTorch && activeCombatEngagements == 0);
 
         // ─── 10. ITEM PICKUP (Torch & Swords) ───────────────────
         bool tryingToPickLamp = interactLampAction.triggered;
@@ -1401,6 +1402,41 @@ public class PlayerController : MonoBehaviour
         
         // UI ko batao ki torch chhod di hai
         OnTorchStateChanged?.Invoke(false);
+    }
+
+    public void SetCombatState(bool enteringCombat)
+    {
+        if (enteringCombat)
+            activeCombatEngagements++;
+        else
+            activeCombatEngagements--;
+
+        if (activeCombatEngagements < 0) activeCombatEngagements = 0;
+
+        bool inCombat = activeCombatEngagements > 0;
+
+        // Agar player ke pas torch hai to usko combat me chupana hai
+        if (hasTorch)
+        {
+            if (inCombat)
+            {
+                // Fight shuru hui - lamp haath se gayab karo
+                if (handLampObject != null) handLampObject.SetActive(false);
+                if (handLampLight != null) handLampLight.enabled = false;
+                
+                // UI bar bhi hide kar do
+                OnTorchStateChanged?.Invoke(false);
+            }
+            else
+            {
+                // Fight khatam - lamp wapas lao
+                if (handLampObject != null) handLampObject.SetActive(true);
+                if (handLampLight != null) handLampLight.enabled = true;
+                
+                // UI bar wapas dikhao
+                OnTorchStateChanged?.Invoke(true);
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
