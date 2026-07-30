@@ -1341,6 +1341,7 @@ public class PlayerController : MonoBehaviour
                 if (handLampLight.intensity <= 0)
                 {
                     handLampLight.intensity = 0;
+                    break; // BUG FIX: Explicitly break out so SpawnOilCane() is guaranteed to be called
                 }
             }
 

@@ -116,10 +116,11 @@ public class FinalBossHorrorVFX : MonoBehaviour
         main.startSize = 18f; // Bohot bada dhuaan (MASSIVE)
         main.startColor = new Color(0f, 0f, 0f, 0.95f); // Pure pitch black
         main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.maxParticles = 150;
+        main.maxParticles = 90; // Optimized from 150
+        main.cullingMode = ParticleSystemCullingMode.PauseAndCatchup;
 
         var emission = ps.emission;
-        emission.rateOverTime = 40f;
+        emission.rateOverTime = 25f; // Optimized from 40
 
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Hemisphere;
@@ -150,10 +151,11 @@ public class FinalBossHorrorVFX : MonoBehaviour
         main.startSize = 6f;
         main.startColor = new Color(0.6f, 0f, 0f, 0.7f); // Khoon jaisa dhuaan
         main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.maxParticles = 60;
+        main.maxParticles = 40; // Optimized from 60
+        main.cullingMode = ParticleSystemCullingMode.PauseAndCatchup;
 
         var emission = ps.emission;
-        emission.rateOverTime = 20f;
+        emission.rateOverTime = 12f; // Optimized from 20
 
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Sphere;
@@ -191,10 +193,11 @@ public class FinalBossHorrorVFX : MonoBehaviour
         main.startSpeed = 0f; // Ek hi jagah jalega
         main.startSize = 1.5f;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.maxParticles = 200;
+        main.maxParticles = 120; // Optimized from 200
+        main.cullingMode = ParticleSystemCullingMode.PauseAndCatchup;
 
         var emission = ps.emission;
-        emission.rateOverTime = 80f;
+        emission.rateOverTime = 50f; // Optimized from 80
 
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Circle;

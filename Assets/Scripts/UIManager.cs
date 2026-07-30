@@ -113,7 +113,9 @@ public class UIManager : MonoBehaviour
             volumeSlider.value = AudioListener.volume;
         }
 
-        if (!hasStartedOnce)
+        string currentSceneName = SceneManager.GetActiveScene().name;
+
+        if (currentSceneName == "Level 1" && !hasStartedOnce)
         {
             isGameActive = false; // Game starts locked in loading/menu
             ShowPanel(loadingPanel, false);

@@ -864,6 +864,66 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1852576806548013000, guid: f370fd70b5c794209b0d2c246a9f5b0a, type: 3}
   m_PrefabInstance: {fileID: 612311142}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &94143311
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 94143313}
+  - component: {fileID: 94143312}
+  m_Layer: 0
+  m_Name: AAAAmbientSoundSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &94143312
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 94143311}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c6653d3f0ff427a86821d6f4dd81cca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AAAAmbientSoundSystem
+  enableWind: 1
+  windBaseVolume: 0.18
+  windGustVolume: 0.5
+  windGustInterval: 12
+  enableCaveDrips: 1
+  dripVolume: 0.35
+  dripMinInterval: 4
+  dripMaxInterval: 12
+  enableHorrorAmbience: 1
+  horrorVolume: 0.25
+  horrorMinInterval: 20
+  horrorMaxInterval: 45
+  heartbeatHealthThreshold: 0.35
+  heartbeatMaxVolume: 0.6
+  bossTensionRadius: 30
+  bossTensionVolume: 0.4
+--- !u!4 &94143313
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 94143311}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1855.0631, y: 0.00013, z: 2662.624}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &95801610 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6649212961405806548, guid: 0565e15e420d04e908906f678e1579b5, type: 3}
@@ -2496,7 +2556,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 382997477}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a5ac11cc976e418e8d13136b07e1f52, type: 3}
   m_Name: 
@@ -10904,6 +10964,60 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 183876184}
   m_SourcePrefab: {fileID: 100100000, guid: f2b5e00ce65de4d378c489f776faf312, type: 3}
+--- !u!1 &1912472658
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1912472660}
+  - component: {fileID: 1912472659}
+  m_Layer: 0
+  m_Name: AAAPerformanceOptimizer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1912472659
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1912472658}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e6895f081b3a4aed96cfc2d03751b2fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AAAPerformanceOptimizer
+  targetFrameRate: 144
+  enableVSync: 0
+  shadowDistance: 120
+  shadowCascades: 2
+  physicsSolverIterations: 3
+  physicsSolverVelocityIterations: 1
+  fixedTimestep: 0.02
+  cameraFarClip: 300
+  enableOcclusionCulling: 1
+  lodBias: 0.75
+--- !u!4 &1912472660
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1912472658}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1855.0631, y: 0.00013, z: 2662.624}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1923092561
 GameObject:
   m_ObjectHideFlags: 0
@@ -11913,6 +12027,66 @@ Transform:
   - {fileID: 289095674}
   - {fileID: 48488638}
   m_Father: {fileID: 707696271}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2121960045
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2121960047}
+  - component: {fileID: 2121960046}
+  m_Layer: 0
+  m_Name: AAAAtmosphereSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2121960046
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2121960045}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4cdbf72851b641709ecd3da166f76eff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AAAAtmosphereSystem
+  level1FogColor: {r: 0.04, g: 0.06, b: 0.08, a: 1}
+  level2FogColor: {r: 0.12, g: 0.01, b: 0.01, a: 1}
+  level3FogColor: {r: 0.02, g: 0, b: 0.02, a: 1}
+  fogDensityBase: 0.025
+  fogPulseAmount: 0.008
+  fogPulseSpeed: 0.3
+  enableLightning: 1
+  lightningMinInterval: 8
+  lightningMaxInterval: 20
+  lightningColor: {r: 0.7, g: 0.5, b: 1, a: 1}
+  lightningIntensityPeak: 35
+  enableGroundMist: 1
+  mistParticleCount: 80
+  ambientIntensityBase: 0.2
+  ambientPulseAmount: 0.05
+  ambientPulseSpeed: 0.15
+--- !u!4 &2121960047
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2121960045}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1855.0631, y: 0.00013, z: 2662.624}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &2130722277
 PrefabInstance:
@@ -18759,3 +18933,6 @@ SceneRoots:
   - {fileID: 133082015}
   - {fileID: 114992317}
   - {fileID: 1495438074}
+  - {fileID: 1912472660}
+  - {fileID: 2121960047}
+  - {fileID: 94143313}

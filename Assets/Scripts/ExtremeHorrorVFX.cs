@@ -81,10 +81,11 @@ public class ExtremeHorrorVFX : MonoBehaviour
         main.startSize = 10f; // Bohot bada dhuaan
         main.startColor = new Color(0.05f, 0f, 0.05f, 0.8f); // Pitch dark shadow
         main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.maxParticles = 100;
+        main.maxParticles = 70; // Optimized: reduced from 100 for performance
+        main.cullingMode = ParticleSystemCullingMode.PauseAndCatchup; // Off-screen mein pause
 
         var emission = ps.emission;
-        emission.rateOverTime = 30f; // Ghana dhuaan
+        emission.rateOverTime = 20f; // Optimized: reduced from 30
 
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Sphere;
@@ -126,10 +127,11 @@ public class ExtremeHorrorVFX : MonoBehaviour
         main.startSize = 0.15f;
         main.startColor = Color.red;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.maxParticles = 80;
+        main.maxParticles = 50; // Optimized: reduced from 80
+        main.cullingMode = ParticleSystemCullingMode.PauseAndCatchup;
 
         var emission = ps.emission;
-        emission.rateOverTime = 25f;
+        emission.rateOverTime = 18f; // Optimized: reduced from 25
 
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Cone;
