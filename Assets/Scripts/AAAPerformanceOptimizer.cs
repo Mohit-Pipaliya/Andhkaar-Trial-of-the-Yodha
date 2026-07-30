@@ -15,16 +15,8 @@ public class AAAPerformanceOptimizer : MonoBehaviour
     public int targetFrameRate = 144;
     public bool enableVSync = false;
 
-    [Header("=== Resolution Scaling (BIG FPS BOOST) ===")]
-    [Tooltip("Enable karo to scale down resolution. 4K screen pe game 1080p mein render hoga = 4x FPS boost!")]
-    public bool enableResolutionScaling = true;
-    [Tooltip("Target render width — 1920 = Full HD (best balance of quality and FPS)")]
-    public int targetWidth = 1920;
-    [Tooltip("Target render height")]
-    public int targetHeight = 1080;
-
     [Header("=== Shadow Settings ===")]
-    public float shadowDistance = 80f;   // Was 120 — reduced for FPS
+    public float shadowDistance = 120f;
     public int shadowCascades = 2;
 
     [Header("=== Physics Settings ===")]
@@ -33,12 +25,12 @@ public class AAAPerformanceOptimizer : MonoBehaviour
     public float fixedTimestep = 0.02f;
 
     [Header("=== Camera ===")]
-    public float cameraFarClip = 250f;   // Was 300 — reduced for FPS
+    public float cameraFarClip = 300f;
     public bool enableOcclusionCulling = true;
 
     [Header("=== LOD Bias ===")]
     [Range(0.3f, 2f)]
-    public float lodBias = 0.65f;        // Was 0.75 — more aggressive LOD = more FPS
+    public float lodBias = 0.75f;
 
     // FPS tracking
     private float fpsAccum = 0f;
@@ -116,25 +108,12 @@ public class AAAPerformanceOptimizer : MonoBehaviour
         QualitySettings.shadows = ShadowQuality.All;
         QualitySettings.lodBias = lodBias;
         QualitySettings.maximumLODLevel = 0;
-        QualitySettings.globalTextureMipmapLimit = 0;
+        QualitySettings.globalTextureMipmapLimit = 0; // Full texture quality for AAA look
         QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
         QualitySettings.skinWeights = SkinWeights.TwoBones;
         Physics.defaultSolverIterations = physicsSolverIterations;
         Physics.defaultSolverVelocityIterations = physicsSolverVelocityIterations;
         Time.fixedDeltaTime = fixedTimestep;
-
-        // === RESOLUTION SCALING — 4K se 1080p = ~4x FPS boost ===
-        // Screenshot mein 4K (3840x2160) dikh raha tha — ye sabse bada FPS killer tha!
-        if (enableResolutionScaling)
-        {
-            int currentW = Screen.width;
-            int currentH = Screen.height;
-            if (currentW > targetWidth || currentH > targetHeight)
-            {
-                Screen.SetResolution(targetWidth, targetHeight, Screen.fullScreenMode);
-                Debug.Log($"[AAAOptimizer] Resolution scaled: {currentW}x{currentH} → {targetWidth}x{targetHeight}");
-            }
-        }
 
         // Reflection probes — render once, not every frame
         ReflectionProbe[] probes = FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None);
@@ -182,10 +161,18 @@ public class AAAPerformanceOptimizer : MonoBehaviour
 
     private void OptimizeAllLights()
     {
-        // Point lights aur Spot lights ko bilkul mat chhuo — user ki original settings rakho
-        // Sirf ek informational log
         Light[] lights = FindObjectsByType<Light>(FindObjectsSortMode.None);
-        Debug.Log($"[AAAOptimizer] {lights.Length} lights found — intensity aur shadows unchanged (user settings preserved).");
+        foreach (var light in lights)
+        {
+            // Convert soft shadows to hard on small-range point lights (not visible difference at short range)
+            if ((light.type == LightType.Point || light.type == LightType.Spot)
+                && light.range < 8f
+                && light.shadows == LightShadows.Soft)
+            {
+                light.shadows = LightShadows.Hard;
+            }
+        }
+        Debug.Log($"[AAAOptimizer] {lights.Length} lights optimized.");
     }
 
     private void DynamicQualityAdjust()

@@ -41,10 +41,6 @@ public class BossEnemyAi : MonoBehaviour
     private GameObject proceduralArena;
     public bool isDead = false;
 
-    // Cached references for performance
-    private UIManager cachedUIManager;
-    private AAAAmbientSoundSystem cachedAmbientSound;
-
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
@@ -79,10 +75,6 @@ public class BossEnemyAi : MonoBehaviour
             if (playerObj != null)
                 player = playerObj.transform;
         }
-
-        // Cache expensive lookups
-        cachedUIManager = FindFirstObjectByType<UIManager>();
-        cachedAmbientSound = FindFirstObjectByType<AAAAmbientSoundSystem>();
     }
 
     void Update()
@@ -311,18 +303,10 @@ public class BossEnemyAi : MonoBehaviour
     private System.Collections.IEnumerator ShowFinishUIAfterDeath()
     {
         yield return new WaitForSeconds(4.5f); // Wait for death animation to finish
-        // Stop boss tension music
-        if (cachedAmbientSound != null) cachedAmbientSound.StopBossTension();
-        // Show finish UI
-        if (cachedUIManager != null)
+        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        if (uiManager != null)
         {
-            cachedUIManager.GameFinished();
-        }
-        else
-        {
-            // Fallback in case cache is stale (scene reload edge case)
-            UIManager uiManager = FindFirstObjectByType<UIManager>();
-            if (uiManager != null) uiManager.GameFinished();
+            uiManager.GameFinished();
         }
     }
 

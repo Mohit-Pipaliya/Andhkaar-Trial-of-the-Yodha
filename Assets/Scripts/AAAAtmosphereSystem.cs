@@ -12,22 +12,18 @@ public class AAAAtmosphereSystem : MonoBehaviour
     public static AAAAtmosphereSystem Instance { get; private set; }
 
     [Header("=== Level Fog Presets ===")]
-    [Tooltip("Level 1: Dark teal horror fog — visible but eerie")]
-    public Color level1FogColor = new Color(0.12f, 0.14f, 0.20f);  // Brighter teal
-    [Tooltip("Level 2: Blood red mist — dark but visible")]
-    public Color level2FogColor = new Color(0.22f, 0.06f, 0.06f);  // Warmer red
-    [Tooltip("Level 3: Void fog — deep dark purple")]
-    public Color level3FogColor = new Color(0.10f, 0.04f, 0.14f);  // Visible purple
+    [Tooltip("Level 1: Dark teal horror fog")]
+    public Color level1FogColor = new Color(0.04f, 0.06f, 0.08f);
+    [Tooltip("Level 2: Blood red mist")]
+    public Color level2FogColor = new Color(0.12f, 0.01f, 0.01f);
+    [Tooltip("Level 3: Pitch black void fog")]
+    public Color level3FogColor = new Color(0.02f, 0.0f, 0.02f);
 
     [Header("=== Fog Settings ===")]
-    [Tooltip("Fog ON/OFF toggle")]
-    public bool enableFog = true;  // ON — realistic linear fog
-    [Tooltip("Linear Fog: Is distance tak kuch nahi (clear visibility near player)")]
-    public float fogStartDistance = 30f;   // 30 unit tak sab clear dikhega
-    [Tooltip("Linear Fog: Is distance par poori tarah fog ho jaayega")]
-    public float fogEndDistance = 100f;    // 100 unit se door sab dhak jaayega
-    [Tooltip("Fog color ka multiplier — bahut zyada mat badhao")]
-    [Range(0.5f, 2f)] public float fogColorBrightness = 1.0f;
+    public float fogDensityBase = 0.025f;
+    [Tooltip("Fog 'breathes' — density oscillates between base and base+pulse")]
+    public float fogPulseAmount = 0.008f;
+    public float fogPulseSpeed = 0.3f;
 
     [Header("=== Lightning Settings ===")]
     public bool enableLightning = true;
@@ -41,8 +37,8 @@ public class AAAAtmosphereSystem : MonoBehaviour
     public float mistParticleCount = 80f;
 
     [Header("=== Ambient Settings ===")]
-    public float ambientIntensityBase = 1.2f;   // Was 0.85 — still too dark, now properly lit
-    public float ambientPulseAmount = 0.08f;
+    public float ambientIntensityBase = 0.2f;
+    public float ambientPulseAmount = 0.05f;
     public float ambientPulseSpeed = 0.15f;
 
     // Internal state
@@ -109,24 +105,16 @@ public class AAAAtmosphereSystem : MonoBehaviour
         else
             targetFogColor = level1FogColor;
 
-        // Fog — Linear mode: nearby = clear, distance = fog (real feel)
-        RenderSettings.fog = enableFog;
-        if (enableFog)
-        {
-            RenderSettings.fogMode    = FogMode.Linear;
-            RenderSettings.fogStartDistance = fogStartDistance;
-            RenderSettings.fogEndDistance   = fogEndDistance;
-            RenderSettings.fogColor   = targetFogColor * fogColorBrightness;
-        }
+        // Enable Unity's built-in fog
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.ExponentialSquared;
+        RenderSettings.fogDensity = fogDensityBase;
+        RenderSettings.fogColor = targetFogColor;
         currentFogColor = targetFogColor;
 
-        // Ambient light — horror atmosphere but VISIBLE
+        // Ambient light — dark but not zero
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-        // Brighter ambient so player can see — still dark/cool tone for horror
-        Color ambBase = currentScene == "Level 2" ? new Color(0.22f, 0.10f, 0.10f)   // Level 2: warm red tint
-                      : currentScene == "Level 3" ? new Color(0.12f, 0.08f, 0.18f)   // Level 3: purple tint
-                      :                             new Color(0.16f, 0.18f, 0.22f);   // Level 1: cool blue-grey
-        RenderSettings.ambientLight = ambBase;
+        RenderSettings.ambientLight = new Color(0.08f, 0.05f, 0.07f);
 
         // Setup lightning light if not already created
         if (lightningLight == null)
@@ -162,36 +150,8 @@ public class AAAAtmosphereSystem : MonoBehaviour
             lightningRoutine = StartCoroutine(LightningRoutine());
         }
 
-        // === Directional Light Intensity — Visible + Horror feel ===
-        float dirIntensity = currentScene == "Level 3" ? 0.70f   // Level 3: darkest but visible
-                           : currentScene == "Level 2" ? 0.75f   // Level 2: slightly darker
-                           :                             0.85f;  // Level 1: properly lit
-        SetDirectionalLightIntensity(dirIntensity);
-
         isInitialized = true;
         Debug.Log($"[AAAAtmosphere] Scene '{currentScene}' atmosphere applied. Fog: {targetFogColor}");
-    }
-
-    /// <summary>
-    /// Scene ke sabhi Directional Lights ki intensity set karta hai.
-    /// Lightning light (jo script khud banati hai) ko skip karta hai.
-    /// </summary>
-    private void SetDirectionalLightIntensity(float intensity)
-    {
-        Light[] allLights = FindObjectsByType<Light>(FindObjectsSortMode.None);
-        int count = 0;
-        foreach (Light light in allLights)
-        {
-            if (light.type == LightType.Directional)
-            {
-                // Apni khud ki lightning light ko skip karo
-                if (light == lightningLight) continue;
-
-                light.intensity = intensity;
-                count++;
-            }
-        }
-        Debug.Log($"[AAAAtmosphere] {count} Directional Light(s) set to intensity {intensity}.");
     }
 
     void Update()
@@ -199,22 +159,23 @@ public class AAAAtmosphereSystem : MonoBehaviour
         if (!isInitialized) return;
 
         float dt = Time.deltaTime;
+        fogPulseTimer += dt * fogPulseSpeed;
         ambientPulseTimer += dt * ambientPulseSpeed;
 
-        // Linear fog: sirf color update karo, start/end runtime me change nahi karein
-        if (enableFog)
-        {
-            currentFogColor = Color.Lerp(currentFogColor, targetFogColor, dt * 1.5f);
-            RenderSettings.fogColor = currentFogColor * fogColorBrightness;
-        }
+        // Smoothly transition fog color toward target
+        currentFogColor = Color.Lerp(currentFogColor, targetFogColor, dt * 2f);
 
-        // Ambient light breathing — scene-based color, clearly visible
+        // Breathing fog density
+        float breathSin = (Mathf.Sin(fogPulseTimer) + 1f) * 0.5f;
+        float currentDensity = fogDensityBase + breathSin * fogPulseAmount;
+        RenderSettings.fogDensity = currentDensity;
+        RenderSettings.fogColor = currentFogColor;
+
+        // Breathing ambient light
         float ambSin = (Mathf.Sin(ambientPulseTimer) + 1f) * 0.5f;
-        float ambMult = ambientIntensityBase + ambSin * ambientPulseAmount;
-        Color baseAmb = currentScene == "Level 2" ? new Color(0.30f, 0.15f, 0.12f)
-                      : currentScene == "Level 3" ? new Color(0.18f, 0.12f, 0.25f)
-                      :                             new Color(0.22f, 0.24f, 0.30f);
-        RenderSettings.ambientLight = baseAmb * ambMult;
+        float ambIntensity = ambientIntensityBase + ambSin * ambientPulseAmount;
+        Color baseAmb = new Color(0.08f, 0.05f, 0.07f);
+        RenderSettings.ambientLight = baseAmb * ambIntensity;
     }
 
     // =================== LIGHTNING ===================
