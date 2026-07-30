@@ -1236,6 +1236,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: ae693dd05984d47c2bc62e6a1c1c324a, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6165451786337905626}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: ae693dd05984d47c2bc62e6a1c1c324a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4513044960238243227}
   m_SourcePrefab: {fileID: 100100000, guid: ae693dd05984d47c2bc62e6a1c1c324a, type: 3}
 --- !u!1 &7049344223262148321 stripped
 GameObject:
@@ -1263,6 +1266,28 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 7.2168765, y: 4.660898, z: 5.4765162}
   m_Center: {x: -0.21411514, y: 0.15327282, z: -2.2383225}
+--- !u!114 &4513044960238243227
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7049344223262148321}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca0a3b77b7fa643f7aba4c9bcb2f911c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoomerLightController
+  pointLights:
+  - {fileID: 3784176119887929119}
+  - {fileID: 4455006514185983893}
+  - {fileID: 3777485508885813907}
+  - {fileID: 3530275071052036119}
+  - {fileID: 2969338314580787101}
+  - {fileID: 7712295928468109832}
+  - {fileID: 2971734449466279612}
+  - {fileID: 8020740857180211544}
+  turnOnDelay: 0.1
 --- !u!4 &7683032749578280027 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: ae693dd05984d47c2bc62e6a1c1c324a, type: 3}
