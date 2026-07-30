@@ -43,6 +43,7 @@ public class SwordDamage : MonoBehaviour
         if (enemy != null)
         {
             enemy.TakeDamage(damageAmount);
+            HitVFX.CreateSparks(other.ClosestPoint(transform.position)); // Chingari effect
             Debug.Log("<color=cyan>Sword Collider ne Enemy ko " + damageAmount + " damage diya!</color>");
             lastHitTime = Time.time;
         }
@@ -55,6 +56,7 @@ public class SwordDamage : MonoBehaviour
             if (enemyNoPatrol != null)
             {
                 enemyNoPatrol.TakeDamage(damageAmount);
+                HitVFX.CreateSparks(other.ClosestPoint(transform.position)); // Chingari effect
                 Debug.Log("<color=cyan>Sword Collider ne Stationary Enemy ko " + damageAmount + " damage diya!</color>");
                 lastHitTime = Time.time;
             }
@@ -66,6 +68,7 @@ public class SwordDamage : MonoBehaviour
                 if (boss != null)
                 {
                     boss.TakeDamage(300); // Player boss ko seedha 300 damage dega ek hit me
+                    HitVFX.CreateSparks(other.ClosestPoint(transform.position)); // Chingari effect
                     Debug.Log("<color=cyan>Sword Collider ne Boss ko 300 damage diya!</color>");
                     lastHitTime = Time.time;
                 }

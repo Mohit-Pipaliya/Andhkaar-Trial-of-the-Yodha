@@ -88,15 +88,22 @@ public class CameraController : MonoBehaviour
         currentY = angles.x;
     }
 
+    [Header("AAA Style Offsets")]
+    [Tooltip("Push camera to the side for over-the-shoulder look (e.g. 0.8 on X)")]
+    public Vector3 shoulderOffset = Vector3.zero; // Set to 0 to keep it centered
+
+    private Vector3 currentVelocity = Vector3.zero;
+    private float currentDistanceVelocity;
+    private float currentActualDistance;
+
     void LateUpdate()
     {
         if (target == null) return;
 
-        // 1. Read Mouse Delta (Supports both New Input System and Legacy Input)
+        // 1. Read Mouse Delta
         Vector2 mouseDelta = Vector2.zero;
         if (Mouse.current != null)
         {
-            // Mouse delta is raw pixels (can be 50+ per frame), so we MUST scale it down
             mouseDelta = Mouse.current.delta.ReadValue() * 0.1f;
         }
 
@@ -107,38 +114,49 @@ public class CameraController : MonoBehaviour
         // 2. Calculate Desired Rotation
         Quaternion rotation = Quaternion.Euler(currentY, currentX, 0);
         
-        // 3. Calculate Desired Position dynamically based on character size
+        // 3. Calculate Target Center Base Position
         Vector3 targetPos = target.position + targetOffset;
+        float dynamicDistance = distance;
+        
         CharacterController cc = target.GetComponent<CharacterController>();
         if (cc != null)
         {
-            // TransformPoint gets the exact world position of the center
             Vector3 worldCenter = target.TransformPoint(cc.center);
-            // Move up to the shoulders/head (approx 30% of total height above center)
             float worldHeight = cc.height * target.lossyScale.y;
-            targetPos = worldCenter + Vector3.up * (worldHeight * 0.3f);
             
-            // Adjust distance automatically based on height so big characters fit on screen
-            distance = Mathf.Max(distance, worldHeight * 1.5f);
+            // Focus point
+            targetPos = worldCenter + Vector3.up * (worldHeight * 0.1f);
+            
+            // Calculate a safe distance without modifying the public 'distance' variable
+            dynamicDistance = Mathf.Max(distance, worldHeight * 2.5f);
         }
 
-        Vector3 direction = new Vector3(0, 0, -distance);
+        // Apply shoulder offset in local camera space
+        targetPos += rotation * shoulderOffset;
+
+        // 4. Calculate Desired Camera Position behind target
+        Vector3 direction = new Vector3(0, 0, -dynamicDistance);
         Vector3 desiredPosition = targetPos + rotation * direction;
 
-        // 4. Camera Collision Check
-        float currentDistance = distance;
+        // 5. Camera Collision Check
+        float currentDistance = dynamicDistance;
         RaycastHit hit;
-        // SphereCast helps prevent camera from clipping into sharp corners
-        if (Physics.SphereCast(targetPos, 0.2f, desiredPosition - targetPos, out hit, distance, collisionMask))
+        
+        // Use a smaller sphere to avoid hitting player's own collider
+        if (Physics.SphereCast(targetPos, 0.15f, desiredPosition - targetPos, out hit, dynamicDistance, collisionMask))
         {
-            // Move camera inward if hitting a wall
-            currentDistance = hit.distance - 0.1f;
+            // If it hits something too close (like player), ignore it, otherwise adjust distance
+            if (hit.distance > 0.5f)
+            {
+                currentDistance = hit.distance - 0.1f;
+            }
         }
 
-        // 5. Apply Final Position & Rotation (shake offset applied here)
+        // 6. Apply Final Position & Rotation
         Vector3 finalPosition = targetPos + rotation * new Vector3(0, 0, -currentDistance);
         finalPosition += shakeOffset;
 
+        // Use simple Lerp to avoid the 'bouncing/rubber-banding' effect of SmoothDamp
         transform.position = Vector3.Lerp(transform.position, finalPosition, Time.deltaTime * smoothSpeed);
         transform.rotation = rotation;
     }

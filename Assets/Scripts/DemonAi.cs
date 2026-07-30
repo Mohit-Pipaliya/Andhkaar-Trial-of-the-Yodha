@@ -203,7 +203,12 @@ public class DemonAi : MonoBehaviour
         if (Vector3.Distance(transform.position, player.position) <= attackRange + 1.5f)
         {
             PlayerController pc = player.GetComponent<PlayerController>();
-            if (pc != null) pc.TakeDamage(100f); // Player ko 100 damage
+            if (pc != null) 
+            {
+                pc.TakeDamage(100f); // Player ko 100 damage
+                // Chingari player ke body (chest) ke paas udni chahiye
+                HitVFX.CreateSparks(player.position + Vector3.up * 1.2f); 
+            }
         }
     }
 
@@ -260,9 +265,16 @@ public class DemonAi : MonoBehaviour
 
         if (animator != null) 
         {
-            animator.SetTrigger("Death");
+            animator.speed = 1f; // Ensure speed is normal
+            animator.SetBool("IsAlert", false);
+            
+            // Sabse common trigger names use kar rahe hain
             animator.SetTrigger("Die");
-            animator.CrossFade("Death", 0.2f);
+            animator.SetTrigger("Death");
+            
+            // State name directly play karne ki koshish (in case triggers are not wired)
+            // Error na aaye isliye CrossFade hila diya hai, Unity fallback karega
+            animator.Play("Die"); 
         }
 
         // Arena wall tod do taaki player aazad ho jaye

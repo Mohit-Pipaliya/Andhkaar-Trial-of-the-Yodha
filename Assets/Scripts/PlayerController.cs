@@ -1351,27 +1351,44 @@ public class PlayerController : MonoBehaviour
         }
 
         // Agar loop se bahar aa gaye aur intensity <= 0 hai, to spawn karo
+        Debug.Log($"DrainLampLight Ended. Checking spawn condition... hasTorch: {hasTorch}, light!=null: {handLampLight != null}, intensity: {(handLampLight != null ? handLampLight.intensity : -1)}, hasSpawnedOilCane: {hasSpawnedOilCane}");
         if (hasTorch && handLampLight != null && handLampLight.intensity <= 0 && !hasSpawnedOilCane)
         {
+            Debug.Log("Condition met! Calling SpawnOilCane()...");
             SpawnOilCane();
+        }
+        else
+        {
+            Debug.LogWarning("Condition NOT met for spawning oil cane.");
         }
     }
 
     private void SpawnOilCane()
     {
+        Debug.Log("SpawnOilCane() is triggered.");
         if (oilCanePrefab == null)
         {
-            Debug.LogWarning("Oil Cane Prefab is not assigned in PlayerController!");
+            Debug.LogError("FAILED: Oil Cane Prefab is not assigned in PlayerController! Please assign it in the Inspector.");
             return;
         }
 
         hasSpawnedOilCane = true;
 
-        // Spawn position: player ke aage, aur thoda height se raycast karke zameen dhoondho
-        Vector3 spawnPos = transform.position + transform.forward * oilCaneSpawnDistance;
-        spawnPos.y += 10f; // Height se raycast
+        Vector3 spawnDirection = transform.forward;
+        float actualDistance = oilCaneSpawnDistance;
 
-        if (Physics.Raycast(spawnPos, Vector3.down, out RaycastHit hit, 30f, Physics.AllLayers, QueryTriggerInteraction.Ignore))
+        // Deewar ke piche (behind wall) spawn na ho jaye isliye aage raycast karenge
+        if (Physics.Raycast(transform.position + Vector3.up, spawnDirection, out RaycastHit wallHit, oilCaneSpawnDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+        {
+            actualDistance = wallHit.distance - 2f; // Deewar se thoda pehle spawn karo
+            if (actualDistance < 2f) actualDistance = 2f; // Kam se kam 2 meter door
+        }
+
+        // Spawn position nikalo
+        Vector3 spawnPos = transform.position + spawnDirection * actualDistance;
+        spawnPos.y += 10f; // Height se zameen dhoondhne ke liye
+
+        if (Physics.Raycast(spawnPos, Vector3.down, out RaycastHit hit, 30f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
         {
             spawnPos = hit.point;
             spawnPos.y += 1.5f; // Hava me thoda terta hua spawn hoga
@@ -1382,26 +1399,43 @@ public class PlayerController : MonoBehaviour
         }
 
         GameObject spawnedCane = Instantiate(oilCanePrefab, spawnPos, Quaternion.identity);
-        spawnedCane.AddComponent<FloatingItem>(); // Tairne ka effect add karein
-        Debug.Log("Dynamic Oil Cane spawned at " + spawnPos);
+        if (spawnedCane.GetComponent<FloatingItem>() == null)
+        {
+            spawnedCane.AddComponent<FloatingItem>(); // Tairne ka effect add karein
+        }
+        Debug.Log("SUCCESS: Dynamic Oil Cane spawned at " + spawnPos + " (Distance: " + actualDistance + ")");
 
-        // Ensure it has a point light so the player can see it easily in the dark
+        // Andhere me asani se dikhne ke liye ek tagdi (powerful) light lagate hain
         Light caneLight = spawnedCane.GetComponentInChildren<Light>();
         if (caneLight == null)
         {
             GameObject lightObj = new GameObject("CaneLight");
             lightObj.transform.SetParent(spawnedCane.transform);
-            lightObj.transform.localPosition = Vector3.up * 0.5f; // Slightly above
+            lightObj.transform.localPosition = Vector3.up * 1f; 
             caneLight = lightObj.AddComponent<Light>();
-            caneLight.type = LightType.Point;
-            caneLight.range = 10f;
-            caneLight.intensity = 5f; // Make it bright enough to see
-            caneLight.color = new Color(1f, 0.6f, 0.1f); // Warm color
         }
-        else
+        
+        caneLight.type = LightType.Point;
+        caneLight.range = 30f; // Range bohot zyada taaki door se dikhe
+        caneLight.intensity = 15f; // Bohot chamkega
+        caneLight.color = new Color(0f, 1f, 0.2f); // Neon Green color (taaki demon light se alag dikhe)
+        caneLight.enabled = true;
+
+        // Ek lamba laser jaisa pillar (indicator) banate hain taaki dur se bhi dikh jaye
+        LineRenderer indicator = spawnedCane.AddComponent<LineRenderer>();
+        indicator.useWorldSpace = false;
+        indicator.positionCount = 2;
+        indicator.SetPosition(0, Vector3.zero);
+        indicator.SetPosition(1, Vector3.up * 10f); // 10 meter lamba pillar
+        indicator.startWidth = 0.2f;
+        indicator.endWidth = 0.2f;
+        
+        Shader defaultShader = Shader.Find("Sprites/Default");
+        if (defaultShader != null)
         {
-            caneLight.enabled = true;
-            caneLight.intensity = Mathf.Max(caneLight.intensity, 5f);
+            Material glowMat = new Material(defaultShader);
+            glowMat.color = new Color(0f, 1f, 0.2f, 0.5f); // Semi-transparent green
+            indicator.material = glowMat;
         }
     }
 
