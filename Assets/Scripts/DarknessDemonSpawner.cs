@@ -69,10 +69,10 @@ public class DarknessDemonSpawner : MonoBehaviour
     {
         isSpawning = true;
         
-        // Thoda intezaar karo taaki intensity 0 hote hi turant na aa jaye (2 second delay)
-        yield return new WaitForSeconds(2f);
+        // Thoda intezaar karo taaki intensity 0 hote hi turant na aa jaye (5 second delay as requested)
+        yield return new WaitForSeconds(5f);
 
-        // 2 second baad wapas check karo ki player ne oil to nahi le liya YA combat shuru nahi ho gaya
+        // 5 second baad wapas check karo ki player ne oil to nahi le liya YA combat shuru nahi ho gaya
         if ((player.handLampLight != null && player.handLampLight.intensity > 0.05f) || player.activeCombatEngagements > 0 || IsAnyDemonNearby())
         {
             isSpawning = false;
@@ -82,6 +82,14 @@ public class DarknessDemonSpawner : MonoBehaviour
         // Spawn position nikalo (Player ke thik SAMNE, 25 meter door)
         Vector3 spawnPos = player.transform.position + (player.transform.forward * 25f);
         
+        // Terrain ke upar exactly spawn karne ke liye raycast (taaki ground se upar ya niche na rahe)
+        Vector3 rayStart = spawnPos;
+        rayStart.y += 30f;
+        if (Physics.Raycast(rayStart, Vector3.down, out RaycastHit rayHit, 60f, Physics.AllLayers, QueryTriggerInteraction.Ignore))
+        {
+            spawnPos = rayHit.point;
+        }
+
         // NavMesh par safe position dhundho
         NavMeshHit hit;
         if (NavMesh.SamplePosition(spawnPos, out hit, 10f, NavMesh.AllAreas))

@@ -1070,7 +1070,7 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 0.05
+  m_Intensity: 0.4
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -12061,7 +12061,7 @@ MonoBehaviour:
   level2FogColor: {r: 0.12, g: 0.01, b: 0.01, a: 1}
   level3FogColor: {r: 0.02, g: 0, b: 0.02, a: 1}
   fogDensityBase: 0.025
-  fogPulseAmount: 0.008
+  fogPulseAmount: 30
   fogPulseSpeed: 0.3
   enableLightning: 1
   lightningMinInterval: 8
@@ -12070,7 +12070,7 @@ MonoBehaviour:
   lightningIntensityPeak: 35
   enableGroundMist: 1
   mistParticleCount: 80
-  ambientIntensityBase: 0.2
+  ambientIntensityBase: 0.5
   ambientPulseAmount: 0.05
   ambientPulseSpeed: 0.15
 --- !u!4 &2121960047

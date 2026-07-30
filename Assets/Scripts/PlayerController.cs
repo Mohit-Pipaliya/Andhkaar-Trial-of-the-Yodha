@@ -1374,7 +1374,7 @@ public class PlayerController : MonoBehaviour
         if (Physics.Raycast(spawnPos, Vector3.down, out RaycastHit hit, 30f, Physics.AllLayers, QueryTriggerInteraction.Ignore))
         {
             spawnPos = hit.point;
-            spawnPos.y += 0.2f; // Offset taaki zameen ke andar na ghuse
+            spawnPos.y += 1.5f; // Hava me thoda terta hua spawn hoga
         }
         else
         {
@@ -1382,6 +1382,7 @@ public class PlayerController : MonoBehaviour
         }
 
         GameObject spawnedCane = Instantiate(oilCanePrefab, spawnPos, Quaternion.identity);
+        spawnedCane.AddComponent<FloatingItem>(); // Tairne ka effect add karein
         Debug.Log("Dynamic Oil Cane spawned at " + spawnPos);
 
         // Ensure it has a point light so the player can see it easily in the dark
