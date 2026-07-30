@@ -223,6 +223,13 @@ public class AdvancedSceneTeleport : MonoBehaviour
         PlayerPrefs.SetInt("SkipMenuOnRetry", 1);
         PlayerPrefs.Save();
 
+        // Save Player's current health, weapons, and torch state before leaving this scene
+        PlayerController pc = player.GetComponent<PlayerController>();
+        if (pc != null)
+        {
+            GameSaveManager.SaveGameState(pc);
+        }
+
         // Load the Next Scene
         PendingSpawnPortalID = destinationPortalID; 
         

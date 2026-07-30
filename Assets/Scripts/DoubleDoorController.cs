@@ -127,9 +127,18 @@ public class DoubleDoorController : MonoBehaviour
         float targetLeftAngle = isOpen ? leftDoorOpenAngle : 0f;
         float targetRightAngle = isOpen ? rightDoorOpenAngle : 0f;
 
+        bool wasMoving = (currentLeftAngle != targetLeftAngle) || (currentRightAngle != targetRightAngle);
+
         // Explicitly move the angle towards the target
         currentLeftAngle = Mathf.MoveTowards(currentLeftAngle, targetLeftAngle, speedInDegrees * Time.deltaTime);
         currentRightAngle = Mathf.MoveTowards(currentRightAngle, targetRightAngle, speedInDegrees * Time.deltaTime);
+        
+        bool isMovingNow = (currentLeftAngle != targetLeftAngle) || (currentRightAngle != targetRightAngle);
+
+        if (wasMoving && !isMovingNow && doorAudioSource != null)
+        {
+            doorAudioSource.Stop();
+        }
         
         // Apply the exact angle to the doors
         if (leftDoor != null) 

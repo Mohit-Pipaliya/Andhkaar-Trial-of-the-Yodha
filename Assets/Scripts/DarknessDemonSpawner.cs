@@ -43,6 +43,18 @@ public class DarknessDemonSpawner : MonoBehaviour
             }
         }
 
+        // Demon spawn nahi hona chahiye jab combat chal raha ho
+        if (player.activeCombatEngagements > 0)
+        {
+            isDark = false;
+        }
+
+        // Ya fir koi demon pehle se hi aas paas (samne) ho
+        if (isDark && IsAnyDemonNearby())
+        {
+            isDark = false;
+        }
+
         if (isDark)
         {
             // Agar andhera hai, aur abhi tak koi demon nahi aaya hai, to spawn karo
@@ -60,11 +72,11 @@ public class DarknessDemonSpawner : MonoBehaviour
         // Thoda intezaar karo taaki intensity 0 hote hi turant na aa jaye (2 second delay)
         yield return new WaitForSeconds(2f);
 
-        // 2 second baad wapas check karo ki player ne oil to nahi le liya
-        if (player.handLampLight != null && player.handLampLight.intensity > 0.05f)
+        // 2 second baad wapas check karo ki player ne oil to nahi le liya YA combat shuru nahi ho gaya
+        if ((player.handLampLight != null && player.handLampLight.intensity > 0.05f) || player.activeCombatEngagements > 0 || IsAnyDemonNearby())
         {
             isSpawning = false;
-            yield break; // Player ne oil le liya, isiliye spawn cancel
+            yield break; // Player ne oil le liya ya combat aa gaya, isiliye spawn cancel
         }
 
         // Spawn position nikalo (Player ke thik SAMNE, 25 meter door)
@@ -123,9 +135,36 @@ public class DarknessDemonSpawner : MonoBehaviour
         // Demon mar gaya ya gayab ho gaya
         activeDemon = null; 
         
-        // Naya demon aane se pehle 3 second ka break do
-        yield return new WaitForSeconds(3f); 
+        // Naya demon aane se pehle 5 second ka break do
+        yield return new WaitForSeconds(5f); 
         
         isSpawning = false;
+    }
+
+    private bool IsAnyDemonNearby()
+    {
+        float checkRadius = 45f;
+        
+        // Check for DemonAi
+        DemonAi[] demons = FindObjectsByType<DemonAi>(FindObjectsSortMode.None);
+        foreach (DemonAi demon in demons)
+        {
+            if (!demon.isDead && Vector3.Distance(player.transform.position, demon.transform.position) <= checkRadius)
+            {
+                return true;
+            }
+        }
+
+        // Check for EnemyAiNoPatrol
+        EnemyAiNoPatrol[] noPatrolDemons = FindObjectsByType<EnemyAiNoPatrol>(FindObjectsSortMode.None);
+        foreach (EnemyAiNoPatrol demon in noPatrolDemons)
+        {
+            if (!demon.isDead && demon.gameObject != activeDemon && Vector3.Distance(player.transform.position, demon.transform.position) <= checkRadius)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

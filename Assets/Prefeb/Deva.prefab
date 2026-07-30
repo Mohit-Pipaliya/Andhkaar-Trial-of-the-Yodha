@@ -604,7 +604,10 @@ MonoBehaviour:
   handSword1Object: {fileID: 6325465590951185653}
   handSword2Object: {fileID: 5123429858580927118}
   hasTorch: 0
+  activeCombatEngagements: 0
   handLampObject: {fileID: 8621445804672939809}
+  oilCanePrefab: {fileID: 2476785098520675071, guid: d1d725287eabd4f41a7ba837b27c5805, type: 3}
+  oilCaneSpawnDistance: 10
   handLampLight: {fileID: 4267014662595684135}
   lampDrainRate: 10
   maxLampIntensity: 100

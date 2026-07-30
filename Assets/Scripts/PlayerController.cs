@@ -155,6 +155,13 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Player ke haath ka lamp GameObject — Editor mein position set karo, script shuru mein hide kar degi")]
     public GameObject handLampObject;       // Haath waala lamp (pre-positioned)
 
+    [Header("Dynamic Oil Cane Spawning")]
+    [Tooltip("Prefab for the Oil Cane to spawn when light runs out")]
+    public GameObject oilCanePrefab;
+    [Tooltip("How far ahead of the player the Oil Cane should spawn")]
+    public float oilCaneSpawnDistance = 15f;
+    private bool hasSpawnedOilCane = false;
+
     [Tooltip("Hand Lamp ke andar jo Point Light hai, use yahan drag karein")]
     public Light handLampLight;
 
@@ -510,7 +517,7 @@ public class PlayerController : MonoBehaviour
 
         if (sceneDirectionalLight != null)
         {
-            sceneDirectionalLight.intensity = Mathf.Lerp(0.8f, 1.25f, ambientIntensity * 0.5f);
+            sceneDirectionalLight.intensity = 0.05f;
             sceneDirectionalLight.color = Color.Lerp(new Color(0.75f, 0.78f, 0.9f, 1f), new Color(0.95f, 0.82f, 0.65f, 1f), hasTorch ? 0.2f : 0.08f);
         }
     }
@@ -1331,8 +1338,10 @@ public class PlayerController : MonoBehaviour
             {
                 handLampLight.intensity -= lampDrainRate * Time.deltaTime;
 
-                if (handLampLight.intensity < 0)
+                if (handLampLight.intensity <= 0)
+                {
                     handLampLight.intensity = 0;
+                }
             }
 
             // UI slider update (frozen ya nahi, slider current value dikhaye)
@@ -1340,12 +1349,66 @@ public class PlayerController : MonoBehaviour
 
             yield return null; // Next frame tak wait karo
         }
+
+        // Agar loop se bahar aa gaye aur intensity <= 0 hai, to spawn karo
+        if (hasTorch && handLampLight != null && handLampLight.intensity <= 0 && !hasSpawnedOilCane)
+        {
+            SpawnOilCane();
+        }
+    }
+
+    private void SpawnOilCane()
+    {
+        if (oilCanePrefab == null)
+        {
+            Debug.LogWarning("Oil Cane Prefab is not assigned in PlayerController!");
+            return;
+        }
+
+        hasSpawnedOilCane = true;
+
+        // Spawn position: player ke aage, aur thoda height se raycast karke zameen dhoondho
+        Vector3 spawnPos = transform.position + transform.forward * oilCaneSpawnDistance;
+        spawnPos.y += 10f; // Height se raycast
+
+        if (Physics.Raycast(spawnPos, Vector3.down, out RaycastHit hit, 30f, Physics.AllLayers, QueryTriggerInteraction.Ignore))
+        {
+            spawnPos = hit.point;
+            spawnPos.y += 0.2f; // Offset taaki zameen ke andar na ghuse
+        }
+        else
+        {
+            spawnPos.y -= 10f; // Fallback agar raycast fail ho jaye
+        }
+
+        GameObject spawnedCane = Instantiate(oilCanePrefab, spawnPos, Quaternion.identity);
+        Debug.Log("Dynamic Oil Cane spawned at " + spawnPos);
+
+        // Ensure it has a point light so the player can see it easily in the dark
+        Light caneLight = spawnedCane.GetComponentInChildren<Light>();
+        if (caneLight == null)
+        {
+            GameObject lightObj = new GameObject("CaneLight");
+            lightObj.transform.SetParent(spawnedCane.transform);
+            lightObj.transform.localPosition = Vector3.up * 0.5f; // Slightly above
+            caneLight = lightObj.AddComponent<Light>();
+            caneLight.type = LightType.Point;
+            caneLight.range = 10f;
+            caneLight.intensity = 5f; // Make it bright enough to see
+            caneLight.color = new Color(1f, 0.6f, 0.1f); // Warm color
+        }
+        else
+        {
+            caneLight.enabled = true;
+            caneLight.intensity = Mathf.Max(caneLight.intensity, 5f);
+        }
     }
 
     private void RefillLamp(GameObject oilCan)
     {
         Debug.Log("Refilled Lamp Oil!");
         oilCan.SetActive(false); // consume the oil can from the ground
+        hasSpawnedOilCane = false; // Reset spawn flag so we can spawn another one later
 
         if (handLampLight != null && hasTorch)
         {

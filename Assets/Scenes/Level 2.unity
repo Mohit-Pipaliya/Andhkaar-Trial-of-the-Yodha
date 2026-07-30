@@ -2718,7 +2718,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 612783388434945951, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 401.8
+      value: 380
       objectReference: {fileID: 0}
     - target: {fileID: 612783388434945951, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
       propertyPath: m_LocalPosition.y
@@ -2726,7 +2726,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 612783388434945951, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 1588.6
+      value: 2287.9
       objectReference: {fileID: 0}
     - target: {fileID: 612783388434945951, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
       propertyPath: m_LocalRotation.w
@@ -7094,7 +7094,7 @@ Light:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1478361998}
-  m_Enabled: 0
+  m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
