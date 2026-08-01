@@ -551,6 +551,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 791d0d320bdbe490b80a990a8497d4e5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
+  resetSaveOnPlay: 0
   walkSpeed: 20
   runSpeed: 50
   crouchSpeed: 20
@@ -607,7 +608,7 @@ MonoBehaviour:
   activeCombatEngagements: 0
   handLampObject: {fileID: 8621445804672939809}
   oilCanePrefab: {fileID: 2476785098520675071, guid: d1d725287eabd4f41a7ba837b27c5805, type: 3}
-  oilCaneSpawnDistance: 10
+  oilCaneSpawnDistance: 20
   handLampLight: {fileID: 4267014662595684135}
   lampDrainRate: 10
   maxLampIntensity: 100

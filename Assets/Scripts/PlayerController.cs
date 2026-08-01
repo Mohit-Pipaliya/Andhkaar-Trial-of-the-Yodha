@@ -7,6 +7,9 @@ using System;
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
+    [Header("Testing & Debugging")]
+    [Tooltip("Agar isko tick karoge toh har baar game start hone par purana save delete ho jayega (Fresh Start).")]
+    public bool resetSaveOnPlay = false;
     // ═══════════════════════════════════════════════════════════
     //  MOVEMENT
     // ═══════════════════════════════════════════════════════════
@@ -411,6 +414,10 @@ public class PlayerController : MonoBehaviour
         currentHealth = maxHealth; // Setup health default
         
         // --- NEW: Load Game State across levels ---
+        if (resetSaveOnPlay)
+        {
+            GameSaveManager.ClearSave();
+        }
         GameSaveManager.LoadGameState(this);
         if (animator != null)
             animator.applyRootMotion = false;
@@ -421,21 +428,25 @@ public class PlayerController : MonoBehaviour
         originalHeight = controller.height;
         originalCenter = controller.center;
 
-        // ── Hand Lamp shuru mein hide karo ──────────────────────
-        // Editor mein position adjust kar sakte ho, play pe automatically hidden hoga
+        // ── Hand Lamp visual sync ──────────────────────
+        // Load Game State ke baad agar torch hai toh usko dikhao, warna hide karo
         if (handLampObject != null)
-            handLampObject.SetActive(false);
+            handLampObject.SetActive(hasTorch);
 
         if (handLampLight != null)
-            handLampLight.enabled = false;
+        {
+            handLampLight.enabled = hasTorch;
+            if (hasTorch)
+            {
+                handLampLight.intensity = maxLampIntensity; // Ya saved intensity agar aage implement karo
+                lampDrainCoroutine = StartCoroutine(DrainLampOil());
+            }
+        }
 
-        if (handSword1Object != null)
-            handSword1Object.SetActive(false);
-
-        if (handSword2Object != null)
-            handSword2Object.SetActive(false);
-            
-        UpdateWeaponState(WeaponType.None);
+        // ── Hand Sword visual sync ──────────────────────
+        // LoadGameState ne pehle hi currentWeapon set kar diya hai.
+        // Hum bas dobara UpdateWeaponState call kar dete hain taaki visual sync ho jaye.
+        UpdateWeaponState(currentWeapon);
 
         // ── UI Prompts shuru mein hide karo (sabhi bacchon ko chupa do) ──
         if (pressOUI != null)
@@ -651,123 +662,96 @@ public class PlayerController : MonoBehaviour
         // ─── 5. ATTACK ──────────────────────────────────────────
         HandleAttack(groundedNow);
 
-        // ─── 6. JUMP EXECUTION ──────────────────────────────────
-        // Jump fires when: buffer is active AND coyote time allows AND not sliding
-        bool canJump = jumpBufferCounter > 0f && isGrounded && !isSliding;
-
-        if (canJump)
-        {
-            // Apply velocity IMMEDIATELY — no coroutine delay, no hawa mein floating
-            verticalVelocity  = jumpVelocity;
-            isJumping         = true;
-            coyoteTimer       = 0f;           // Consume coyote time
-            jumpBufferCounter = 0f;           // Consume buffer
-
-            // Fire animation trigger SAME frame as force — perfectly synced
-            animator.SetTrigger("Jump");
-        }
-
-        // ─── 7. HORIZONTAL MOVEMENT ─────────────────────────────
-        // Torch hone par alag speeds use karo — realistic heavy-lamp feel
-        float currentSpeed;
-        if (isSliding)
-            currentSpeed = crouchSpeed;
-        else if (hasTorch)
-            currentSpeed = isRunning ? torchRunSpeed : torchWalkSpeed;
-        else
-            currentSpeed = isRunning ? runSpeed : walkSpeed;
-        // Slow down movement during attack — adds physical weight to each strike
-        if (isAttacking) currentSpeed *= attackMovementFraction;
-
-        Transform camTransform = Camera.main != null ? Camera.main.transform : null;
-        if (camTransform == null)
-        {
-            Camera fallbackCam = FindFirstObjectByType<Camera>();
-            if (fallbackCam != null) camTransform = fallbackCam.transform;
-        }
-
-        // --- NEW: Player hamesha wahi dekhega jahan camera dekh raha hai (Aim / Strafe Mode) ---
-        if (camTransform != null)
-        {
-            Vector3 currentRot = transform.eulerAngles;
-            Quaternion targetRot = Quaternion.Euler(currentRot.x, camTransform.eulerAngles.y, currentRot.z);
-            // Fast rotation so the player feels responsive to mouse movement
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * turnSmoothSpeed * 2f);
-        }
-
+        // ─── 6. HORIZONTAL MOVEMENT (AAA Smooth) ────────────────
         Vector3 targetHorizontal = Vector3.zero;
-        if (hasInput)
+
+        if (hasInput && !isSliding)
         {
             Vector3 moveDir = Vector3.zero;
+            Transform camTransform = Camera.main != null ? Camera.main.transform : null;
 
             if (camTransform != null)
             {
-                // Movement camera ke hisaab se hoga
+                // Movement relative to camera
                 Vector3 camF = camTransform.forward; camF.y = 0f; camF.Normalize();
                 Vector3 camR = camTransform.right;   camR.y = 0f; camR.Normalize();
-                moveDir = (camF * inputDir.z + camR * inputDir.x).normalized;
-            }
-            else
-            {
-                // Agar koi bhi camera na mile toh world space me move karo (crash bachane ke liye)
-                moveDir = new Vector3(inputDir.x, 0f, inputDir.z).normalized;
-                
-                // Fallback rotation if no camera exists
+                moveDir = (camF * rawInput.y + camR * rawInput.x).normalized;
+
+                // Character Rotation (AAA smooth leaning)
                 if (moveDir != Vector3.zero)
                 {
                     transform.rotation = Quaternion.Slerp(transform.rotation,
-                        Quaternion.LookRotation(moveDir), Time.deltaTime * turnSmoothSpeed);
+                        Quaternion.LookRotation(moveDir), Time.deltaTime * (turnSmoothSpeed * 0.7f));
                 }
             }
+            else
+            {
+                moveDir = new Vector3(rawInput.x, 0f, rawInput.y).normalized;
+                
+                if (moveDir != Vector3.zero)
+                {
+                    transform.rotation = Quaternion.Slerp(transform.rotation,
+                        Quaternion.LookRotation(moveDir), Time.deltaTime * (turnSmoothSpeed * 0.7f));
+                }
+            }
+
+            // Realistic heavy-lamp feel
+            float currentSpeed;
+            if (isSliding)
+                currentSpeed = crouchSpeed;
+            else if (hasTorch)
+                currentSpeed = isRunning ? torchRunSpeed : torchWalkSpeed;
+            else
+                currentSpeed = isRunning ? runSpeed : walkSpeed;
+                
+            if (isAttacking) currentSpeed *= attackMovementFraction;
 
             targetHorizontal = moveDir * currentSpeed;
         }
 
-        // Air & Ground control: blend between current momentum and desired direction
+        // Smooth acceleration and deceleration for heavy AAA feel
         if (groundedNow)
         {
-            // Instant movement ki jagah smooth acceleration aur deceleration lagaya hai 
-            // taaki animation robotic na lage aur foot sliding kam ho.
-            float groundAccel = hasInput ? 10f : 15f; 
+            float groundAccel = hasInput ? 6f : 8f; 
             horizontalVelocity = Vector3.Lerp(horizontalVelocity, targetHorizontal, Time.deltaTime * groundAccel);
         }
         else
         {
-            // airControlAmount = 0 → no control (pure momentum)
-            // airControlAmount = 1 → full instant control
-            float lerpSpeed    = airControlAmount * 10f; // scale for good feel
-            horizontalVelocity = Vector3.Lerp(horizontalVelocity, targetHorizontal,
-                                              Time.deltaTime * lerpSpeed);
+            float lerpSpeed = airControlAmount * 4f; 
+            horizontalVelocity = Vector3.Lerp(horizontalVelocity, targetHorizontal, Time.deltaTime * lerpSpeed);
         }
 
         controller.Move(horizontalVelocity * Time.deltaTime);
 
+        // ─── 7. JUMP EXECUTION ──────────────────────────────────
+        bool canJump = jumpBufferCounter > 0f && isGrounded && !isSliding;
+
+        if (canJump)
+        {
+            verticalVelocity  = jumpVelocity;
+            isJumping         = true;
+            coyoteTimer       = 0f;
+            jumpBufferCounter = 0f;
+            animator.SetTrigger("Jump");
+        }
+
         // ─── 8. DUAL GRAVITY ────────────────────────────────────
-        // This is the key to a REALISTIC jump feel:
-        //   • Going up   → normal gravity
-        //   • Going down → fallGravityMultiplier × gravity  (heavy landing)
-        //   • Space released early → lowJumpMultiplier × gravity  (short hop)
         float activeGravity = baseGravity;
 
         if (isJumping || !groundedNow)
         {
             if (verticalVelocity < 0f)
             {
-                // Falling — apply heavier gravity for satisfying landing
                 activeGravity = baseGravity * fallGravityMultiplier;
             }
             else if (verticalVelocity > 0f && !jumpHeld)
             {
-                // Rising but Space released — cut jump short (variable height)
                 activeGravity = baseGravity * lowJumpMultiplier;
             }
         }
 
         verticalVelocity += activeGravity * Time.deltaTime;
-
-        // Terminal velocity cap (prevents absurd fall speeds on tall drops)
         verticalVelocity = Mathf.Max(verticalVelocity, baseGravity * 3f);
-
         controller.Move(new Vector3(0f, verticalVelocity, 0f) * Time.deltaTime);
 
         // ─── 9. ANIMATIONS ──────────────────────────────────────

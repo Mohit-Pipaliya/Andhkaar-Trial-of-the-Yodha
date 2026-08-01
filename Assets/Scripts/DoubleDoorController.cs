@@ -24,6 +24,9 @@ public class DoubleDoorController : MonoBehaviour
     public AudioSource doorAudioSource;
     public AudioClip doorOpenSound;
     public AudioClip doorCloseSound;
+    [Tooltip("Slight random pitch adds realism by avoiding repetitive sounds.")]
+    [Range(0f, 0.2f)]
+    public float pitchRandomness = 0.1f;
 
     private bool isPlayerNear = false;
     private bool isOpen = false;
@@ -35,10 +38,23 @@ public class DoubleDoorController : MonoBehaviour
     // We will track the current rotation angles explicitly
     private float currentLeftAngle = 0f;
     private float currentRightAngle = 0f;
+    
+    // Smooth movement velocities
+    private float leftVelocity;
+    private float rightVelocity;
 
     void Start()
     {
         if (openDoorUI != null) openDoorUI.SetActive(false);
+
+        if (doorAudioSource != null)
+        {
+            // Force 3D spatial audio for realistic sound positioning
+            doorAudioSource.spatialBlend = 1f; 
+            doorAudioSource.minDistance = 2f;
+            doorAudioSource.maxDistance = 15f;
+            doorAudioSource.rolloffMode = AudioRolloffMode.Logarithmic;
+        }
 
         if (leftDoor != null)
         {
@@ -105,7 +121,11 @@ public class DoubleDoorController : MonoBehaviour
             {
                 Debug.Log("[Door] Player left the zone, closing the door.");
                 isOpen = false;
-                if (doorAudioSource != null && doorCloseSound != null) doorAudioSource.PlayOneShot(doorCloseSound);
+                if (doorAudioSource != null && doorCloseSound != null) 
+                {
+                    doorAudioSource.pitch = 1f + Random.Range(-pitchRandomness, pitchRandomness);
+                    doorAudioSource.PlayOneShot(doorCloseSound);
+                }
             }
         }
 
@@ -117,28 +137,23 @@ public class DoubleDoorController : MonoBehaviour
             {
                 Debug.Log("[Door] O key pressed! Opening the door now.");
                 isOpen = true;
-                if (doorAudioSource != null && doorOpenSound != null) doorAudioSource.PlayOneShot(doorOpenSound);
+                if (doorAudioSource != null && doorOpenSound != null) 
+                {
+                    doorAudioSource.pitch = 1f + Random.Range(-pitchRandomness, pitchRandomness);
+                    doorAudioSource.PlayOneShot(doorOpenSound);
+                }
                 if (openDoorUI != null) openDoorUI.SetActive(false);
             }
         }
 
-        // 3. Smooth Door Animation
-        float speedInDegrees = openSpeed * 50f; // Speed of opening/closing
+        // 3. Smooth Door Animation (Realistic Physics Feel)
         float targetLeftAngle = isOpen ? leftDoorOpenAngle : 0f;
         float targetRightAngle = isOpen ? rightDoorOpenAngle : 0f;
 
-        bool wasMoving = (currentLeftAngle != targetLeftAngle) || (currentRightAngle != targetRightAngle);
-
-        // Explicitly move the angle towards the target
-        currentLeftAngle = Mathf.MoveTowards(currentLeftAngle, targetLeftAngle, speedInDegrees * Time.deltaTime);
-        currentRightAngle = Mathf.MoveTowards(currentRightAngle, targetRightAngle, speedInDegrees * Time.deltaTime);
-        
-        bool isMovingNow = (currentLeftAngle != targetLeftAngle) || (currentRightAngle != targetRightAngle);
-
-        if (wasMoving && !isMovingNow && doorAudioSource != null)
-        {
-            doorAudioSource.Stop();
-        }
+        // Easing smoothing using SmoothDampAngle instead of linear MoveTowards
+        float smoothTime = 1f / Mathf.Max(openSpeed, 0.1f);
+        currentLeftAngle = Mathf.SmoothDampAngle(currentLeftAngle, targetLeftAngle, ref leftVelocity, smoothTime);
+        currentRightAngle = Mathf.SmoothDampAngle(currentRightAngle, targetRightAngle, ref rightVelocity, smoothTime);
         
         // Apply the exact angle to the doors
         if (leftDoor != null) 

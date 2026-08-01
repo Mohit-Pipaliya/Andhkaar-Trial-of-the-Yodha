@@ -88,13 +88,23 @@ public class CameraController : MonoBehaviour
         currentY = angles.x;
     }
 
+    [Header("AAA Smoothing")]
+    [Tooltip("How smooth the camera rotation feels (lower is snappier, higher is more floaty).")]
+    public float rotationSmoothTime = 0.05f;
+    [Tooltip("How smooth the camera follows the player position.")]
+    public float positionSmoothTime = 0.03f;
+    
     [Header("AAA Style Offsets")]
     [Tooltip("Push camera to the side for over-the-shoulder look (e.g. 0.8 on X)")]
-    public Vector3 shoulderOffset = Vector3.zero; // Set to 0 to keep it centered
+    public Vector3 shoulderOffset = Vector3.zero;
 
-    private Vector3 currentVelocity = Vector3.zero;
-    private float currentDistanceVelocity;
+    private float targetX;
+    private float targetY;
+    private float rotXVelocity;
+    private float rotYVelocity;
+    private Vector3 posVelocity;
     private float currentActualDistance;
+    private float distanceVelocity;
 
     void LateUpdate()
     {
@@ -107,11 +117,15 @@ public class CameraController : MonoBehaviour
             mouseDelta = Mouse.current.delta.ReadValue() * 0.1f;
         }
 
-        currentX += mouseDelta.x * sensitivity;
-        currentY -= mouseDelta.y * sensitivity;
-        currentY = Mathf.Clamp(currentY, yMinLimit, yMaxLimit);
+        // Add to target rotation, not current directly (for smoothing)
+        targetX += mouseDelta.x * sensitivity;
+        targetY -= mouseDelta.y * sensitivity;
+        targetY = Mathf.Clamp(targetY, yMinLimit, yMaxLimit);
 
-        // 2. Calculate Desired Rotation
+        // 2. Smoothly damp the current rotation towards target rotation
+        currentX = Mathf.SmoothDampAngle(currentX, targetX, ref rotXVelocity, rotationSmoothTime);
+        currentY = Mathf.SmoothDampAngle(currentY, targetY, ref rotYVelocity, rotationSmoothTime);
+        
         Quaternion rotation = Quaternion.Euler(currentY, currentX, 0);
         
         // 3. Calculate Target Center Base Position
@@ -123,41 +137,36 @@ public class CameraController : MonoBehaviour
         {
             Vector3 worldCenter = target.TransformPoint(cc.center);
             float worldHeight = cc.height * target.lossyScale.y;
-            
-            // Focus point
             targetPos = worldCenter + Vector3.up * (worldHeight * 0.1f);
-            
-            // Calculate a safe distance without modifying the public 'distance' variable
             dynamicDistance = Mathf.Max(distance, worldHeight * 2.5f);
         }
 
         // Apply shoulder offset in local camera space
         targetPos += rotation * shoulderOffset;
 
-        // 4. Calculate Desired Camera Position behind target
+        // 4. Camera Collision Check
+        float desiredDistance = dynamicDistance;
         Vector3 direction = new Vector3(0, 0, -dynamicDistance);
-        Vector3 desiredPosition = targetPos + rotation * direction;
-
-        // 5. Camera Collision Check
-        float currentDistance = dynamicDistance;
-        RaycastHit hit;
+        Vector3 desiredPositionForRay = targetPos + rotation * direction;
         
-        // Use a smaller sphere to avoid hitting player's own collider
-        if (Physics.SphereCast(targetPos, 0.15f, desiredPosition - targetPos, out hit, dynamicDistance, collisionMask))
+        RaycastHit hit;
+        if (Physics.SphereCast(targetPos, 0.2f, desiredPositionForRay - targetPos, out hit, dynamicDistance, collisionMask))
         {
-            // If it hits something too close (like player), ignore it, otherwise adjust distance
-            if (hit.distance > 0.5f)
+            if (hit.distance > 0.3f)
             {
-                currentDistance = hit.distance - 0.1f;
+                desiredDistance = hit.distance - 0.1f; // Keep a small buffer
             }
         }
 
-        // 6. Apply Final Position & Rotation
-        Vector3 finalPosition = targetPos + rotation * new Vector3(0, 0, -currentDistance);
+        // Smoothly interpolate the distance to prevent sudden snapping when walking past trees/poles
+        currentActualDistance = Mathf.SmoothDamp(currentActualDistance, desiredDistance, ref distanceVelocity, 0.1f);
+
+        // 5. Calculate Final Position
+        Vector3 finalPosition = targetPos + rotation * new Vector3(0, 0, -currentActualDistance);
         finalPosition += shakeOffset;
 
-        // Use simple Lerp to avoid the 'bouncing/rubber-banding' effect of SmoothDamp
-        transform.position = Vector3.Lerp(transform.position, finalPosition, Time.deltaTime * smoothSpeed);
+        // 6. Apply Final Position & Rotation with SmoothDamp (AAA standard for removing micro-jitters)
+        transform.position = Vector3.SmoothDamp(transform.position, finalPosition, ref posVelocity, positionSmoothTime);
         transform.rotation = rotation;
     }
 }

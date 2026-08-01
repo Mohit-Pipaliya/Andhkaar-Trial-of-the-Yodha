@@ -4,13 +4,14 @@ using System.Collections;
 public class FPSOptimizer : MonoBehaviour
 {
     [Header("Frame Rate Settings")]
-    [Tooltip("Kitna FPS chahiye. 80+ ke liye 120 rakhna theek hai.")]
-    public int targetFPS = 120; 
+    [Tooltip("Kitna FPS chahiye. 60 FPS stable ke liye.")]
+    public int targetFPS = 60; 
     [Tooltip("VSync ko 0 karna zaroori hai warna FPS monitor ki hertz (mostly 60) par lock ho jayega.")]
     public bool disableVSync = true; 
 
-    [Header("Graphics Optimization (Bina delete kiye)")]
+    [Header("Graphics Optimization (80+ FPS ke liye Aggressive)")]
     public bool optimizeGraphics = true;
+    public bool disableShadowsForMaxFPS = false; // Isko true karein agar shadows bilkul nahi chahiye
     
     void Awake()
     {
@@ -24,61 +25,73 @@ public class FPSOptimizer : MonoBehaviour
         {
             QualitySettings.vSyncCount = 0; // VSync completely disable
         }
-        Application.targetFrameRate = targetFPS; // Target 120 FPS
+        Application.targetFrameRate = targetFPS; // Target 144 FPS for 80+ steady
 
-        // 2. Graphics Tweaks (FPS badhane ke liye quality thodi optimize hogi, par kuch delete/disable nahi hoga)
+        // 2. Graphics Tweaks (Aggressive for Max FPS)
         if (optimizeGraphics)
         {
-            // Pixel lights kam karne se lighting calculations kam hoti hain (default 4 hota hai, 2 is optimized)
-            QualitySettings.pixelLightCount = 2; 
+            // Pixel lights kam karne se lighting calculations kam hoti hain (default 4 hota hai, 1 is optimized)
+            QualitySettings.pixelLightCount = 1; 
 
-            // Shadows sabse zyada FPS khaati hain. Hum inko disable nahi kar rahe, bas optimize kar rahe hain.
-            QualitySettings.shadowResolution = ShadowResolution.Medium; // High ki jagah Medium
-            QualitySettings.shadowCascades = 2; // 4 cascades ki jagah 2 (better performance)
-            QualitySettings.shadowDistance = 50f; // Kitni door tak shadows dikhengi
-            QualitySettings.shadows = ShadowQuality.HardOnly; // Soft shadows bohot heavy hoti hain
+            // Shadows sabse zyada FPS khaati hain.
+            if (disableShadowsForMaxFPS) 
+            {
+                QualitySettings.shadows = ShadowQuality.Disable;
+            }
+            else 
+            {
+                QualitySettings.shadowResolution = ShadowResolution.Low; // Medium se Low
+                QualitySettings.shadowCascades = 0; // Better performance
+                QualitySettings.shadowDistance = 30f; // Aur paas tak shadows
+                QualitySettings.shadows = ShadowQuality.HardOnly; 
+            }
 
-            // Anti-aliasing ko kam karna (Edges thode sharp honge par FPS badhega)
+            // Anti-aliasing ko kam karna
             QualitySettings.antiAliasing = 0; 
             
-            // Texture quality ko thoda optimize kiya (No blur, just memory saving)
-            QualitySettings.globalTextureMipmapLimit = 1; // 0 (Full) se 1 (Half) kiya, isse VRAM aur bandwidth bachegi
+            // Texture quality ko optimize kiya
+            QualitySettings.globalTextureMipmapLimit = 1; // 1 (Half resolution textures)
 
-            // Character animation bones calculation ko 4 se 2 karna (performance boost for characters)
-            QualitySettings.skinWeights = SkinWeights.TwoBones;
+            // Character animation bones calculation ko 4 se 1 ya 2 karna
+            QualitySettings.skinWeights = SkinWeights.OneBone; // Max performance for characters
 
-            // LODs ko jaldi switch karna taaki poly count kam ho
-            QualitySettings.lodBias = 0.3f; // 0.5 se aur kam karke 0.3 kiya for max FPS
+            // LODs ko jaldi switch karna
+            QualitySettings.lodBias = 0.2f; 
+            
+            // Realtime reflections off
+            QualitySettings.realtimeReflectionProbes = false;
 
-            // 77M Triangles usually Terrain trees/grass ki wajah se hote hain. 
+            // Terrain optimizations
             if (Terrain.activeTerrain != null)
             {
-                Terrain.activeTerrain.treeDistance = 250f; // 200+ still visible, but slightly shorter
-                Terrain.activeTerrain.treeBillboardDistance = 70f; // Jaldi 2D ped banenge
-                Terrain.activeTerrain.detailObjectDistance = 150f; // Grass 150 door tak dikhegi
-                Terrain.activeTerrain.treeMaximumFullLODCount = 10; // Sirf paas ke 10 ped high quality rahenge
+                Terrain.activeTerrain.treeDistance = 150f; // Trees thode jaldi gayab honge
+                Terrain.activeTerrain.treeBillboardDistance = 30f; // Jaldi 2D ped banenge
+                Terrain.activeTerrain.detailObjectDistance = 80f; // Grass kam doori tak dikhegi
+                Terrain.activeTerrain.treeMaximumFullLODCount = 5; // Sirf 5 ped high quality rahenge
+                Terrain.activeTerrain.heightmapPixelError = 10; // Terrain mesh optimize
             }
 
-            // Camera ka viewing distance 
+            // Camera optimizations
             if (Camera.main != null)
             {
-                if (Camera.main.farClipPlane > 600f)
+                if (Camera.main.farClipPlane > 400f)
                 {
-                    Camera.main.farClipPlane = 600f; // Max 600
+                    Camera.main.farClipPlane = 400f; // Max 400 to render less objects
                 }
+                Camera.main.allowHDR = false;
+                Camera.main.allowMSAA = false;
             }
 
-            // Physics calculation ko adha kar diya! (Bohat bada CPU boost)
-            // Default 0.02 (50 times/sec) hota hai. Isey 0.04 (25 times/sec) karne se physics CPU load half ho jata hai
-            Time.fixedDeltaTime = 0.04f; 
+            // Physics calculation ko optimize (60 times/sec for stable 60 FPS)
+            Time.fixedDeltaTime = 0.016666f; 
             
-            // Background loading ko slow karo taaki main game fast chale
+            // Background loading ko slow karo
             Application.backgroundLoadingPriority = ThreadPriority.Low;
             
             // Memory saaf karo shuru me
             System.GC.Collect();
         }
         
-        Debug.Log("FPS Optimizer Applied! Target FPS: " + Application.targetFrameRate);
+        Debug.Log("Aggressive FPS Optimizer Applied! Target FPS: " + Application.targetFrameRate);
     }
 }

@@ -591,6 +591,7 @@ MonoBehaviour:
   targetFPS: 120
   disableVSync: 1
   optimizeGraphics: 1
+  disableShadowsForMaxFPS: 0
 --- !u!4 &58974280
 Transform:
   m_ObjectHideFlags: 0
@@ -6886,6 +6887,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 791d0d320bdbe490b80a990a8497d4e5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerController
+  resetSaveOnPlay: 1
   walkSpeed: 20
   runSpeed: 50
   crouchSpeed: 20
@@ -6942,7 +6944,7 @@ MonoBehaviour:
   activeCombatEngagements: 0
   handLampObject: {fileID: 175961959}
   oilCanePrefab: {fileID: 2476785098520675071, guid: d1d725287eabd4f41a7ba837b27c5805, type: 3}
-  oilCaneSpawnDistance: 15
+  oilCaneSpawnDistance: 20
   handLampLight: {fileID: 2040794762}
   lampDrainRate: 3
   maxLampIntensity: 100
