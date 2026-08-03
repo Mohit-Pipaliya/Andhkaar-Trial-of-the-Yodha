@@ -551,19 +551,6 @@ public class PlayerController : MonoBehaviour
 
         ApplyEnvironmentLighting();
 
-        // ─── HEALTH REGENERATION ────────────────────────────────
-        if (currentHealth < maxHealth && currentHealth > 0)
-        {
-            if (Time.time >= lastDamageTime + healthRegenDelay)
-            {
-                currentHealth += healthRegenRate * Time.deltaTime;
-                if (currentHealth > maxHealth) currentHealth = maxHealth;
-                
-                // UI update smoothly
-                OnHealthChanged?.Invoke(currentHealth);
-            }
-        }
-
         // ─── 1. READ INPUT ──────────────────────────────────────
         Vector2 rawInput     = moveAction.ReadValue<Vector2>();
         bool    isRunning    = runAction.ReadValue<float>()  > 0.1f;
@@ -573,6 +560,31 @@ public class PlayerController : MonoBehaviour
 
         Vector3 inputDir = new Vector3(rawInput.x, 0f, rawInput.y).normalized;
         bool    hasInput = rawInput.sqrMagnitude > 0.01f;
+
+        // ─── IDLE CHECK & HEALTH REGENERATION ───────────────────
+        bool isIdle = !hasInput && !isAttacking && !jumpPressed && controller.isGrounded && !isSpecialActionPlaying;
+        if (isIdle)
+        {
+            idleTimer += Time.deltaTime;
+        }
+        else
+        {
+            idleTimer = 0f;
+        }
+
+        // Regen only if health is below the threshold AND player is idle
+        float regenTargetHealth = maxHealth * lowHealthRegenThreshold;
+        if (currentHealth < regenTargetHealth && currentHealth > 0)
+        {
+            if (Time.time >= lastDamageTime + healthRegenDelay && idleTimer >= idleTimeToRegen)
+            {
+                currentHealth += healthRegenRate * Time.deltaTime;
+                if (currentHealth > regenTargetHealth) currentHealth = regenTargetHealth; // Limit to threshold
+                
+                // UI update smoothly
+                OnHealthChanged?.Invoke(currentHealth);
+            }
+        }
 
         // If a special action is playing, player is dead, or game is not active (paused/loading), block all input
         if (isSpecialActionPlaying || isFrozen || !UIManager.isGameActive || currentHealth <= 0)
@@ -1232,6 +1244,12 @@ public class PlayerController : MonoBehaviour
     private float lastDamageTime = 0f; // Track kab aakhri baar chot lagi thi
     public float healthRegenRate = 100f; // Har second kitni health badhegi (aap isko inspector me badal sakte hain)
     public float healthRegenDelay = 5f;  // Damage lene ke kitne second baad health badhna shuru hogi
+
+    [Tooltip("Health percentage (0 to 1) below which auto-regen starts")]
+    public float lowHealthRegenThreshold = 0.4f; // 40% health se kam hone par regen
+    [Tooltip("Time the player must stand completely idle before regen starts")]
+    public float idleTimeToRegen = 3f;
+    private float idleTimer = 0f;
 
     public void TakeDamage(float damageAmount)
     {
