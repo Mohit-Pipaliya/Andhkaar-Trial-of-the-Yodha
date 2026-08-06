@@ -37,6 +37,25 @@ public class DemonAi : MonoBehaviour
     private bool isPlayerTrapped = false;
     public bool isDead = false;
 
+    // AAA Perf: Pre-computed squared radii — eliminates sqrt every frame
+    private float sqrTriggerRadius;
+    private float sqrAttackRange;
+
+    // AAA Perf: NavMesh destination throttle — only update when player moves >1.5m
+    private Vector3 lastSetDestination = Vector3.positiveInfinity;
+    private const float SqrDestinationThreshold = 2.25f; // 1.5m * 1.5m
+
+    void OnEnable()
+    {
+        if (!isDead)
+            EnemyRegistry.Register(transform);
+    }
+
+    void OnDisable()
+    {
+        EnemyRegistry.Unregister(transform);
+    }
+
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
@@ -61,6 +80,10 @@ public class DemonAi : MonoBehaviour
             healthBarSlider.value = currentHealth;
         }
 
+        // AAA Perf: Pre-compute squared radii once — avoid sqrt every frame
+        sqrTriggerRadius = triggerRadius * triggerRadius;
+        sqrAttackRange   = attackRange   * attackRange;
+
         // Patrol start Point A se
         currentPatrolTarget = pointA;
         if (agent != null && currentPatrolTarget != null)
@@ -73,10 +96,11 @@ public class DemonAi : MonoBehaviour
     {
         if (isDead || player == null || currentHealth <= 0) return;
 
-        float distanceToPlayer = Vector3.Distance(transform.position, player.position);
+        // AAA Perf: sqrMagnitude instead of Distance (no sqrt = ~3x faster)
+        float sqrDist = (transform.position - player.position).sqrMagnitude;
 
         // 1. Agar player paas aaye, toh Arena bana do aur usko trap kar lo
-        if (!isPlayerTrapped && distanceToPlayer <= triggerRadius)
+        if (!isPlayerTrapped && sqrDist <= sqrTriggerRadius)
         {
             isPlayerTrapped = true;
             CreateArenaWall();
@@ -87,7 +111,7 @@ public class DemonAi : MonoBehaviour
         {
             if (isPlayerTrapped) // Jab trap ho gaya, tabhi chase/attack karega
             {
-                if (distanceToPlayer <= attackRange)
+                if (sqrDist <= sqrAttackRange)
                 {
                     currentState = State.Attacking;
                 }
@@ -173,7 +197,13 @@ public class DemonAi : MonoBehaviour
         agent.isStopped = false;
         if (agent.isOnNavMesh)
         {
-            agent.SetDestination(player.position);
+            // AAA Perf: Only update NavMesh path when player moves >1.5m — saves pathfinding cost
+            float sqrDelta = (player.position - lastSetDestination).sqrMagnitude;
+            if (sqrDelta > SqrDestinationThreshold)
+            {
+                agent.SetDestination(player.position);
+                lastSetDestination = player.position;
+            }
         }
     }
 
@@ -200,7 +230,7 @@ public class DemonAi : MonoBehaviour
         yield return new WaitForSeconds(0.4f); // Animation ka hit time
         if (isDead || player == null) yield break;
 
-        if (Vector3.Distance(transform.position, player.position) <= attackRange + 1.5f)
+        if (Vector3.SqrMagnitude(transform.position - player.position) <= (attackRange + 1.5f) * (attackRange + 1.5f))
         {
             PlayerController pc = player.GetComponent<PlayerController>();
             if (pc != null) 

@@ -2775,6 +2775,7 @@ GameObject:
   m_Component:
   - component: {fileID: 876469907}
   - component: {fileID: 876469906}
+  - component: {fileID: 876469908}
   m_Layer: 0
   m_Name: FPS_MANAGER
   m_TagString: Untagged
@@ -2795,9 +2796,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FPSOptimizer
   targetFPS: 144
-  disableVSync: 1
-  optimizeGraphics: 1
-  disableShadowsForMaxFPS: 0
+  applyGeometryBudget: 1
+  enableDynamicResolution: 1
+  minRenderScale: 0.65
+  maxRenderScale: 1
+  dynamicResolutionTargetFPS: 60
+  enableOcclusionCulling: 1
+  prewarmObjectPools: 1
+  poolPrewarmEntries: []
+  hitSparkPrewarmCount: 8
 --- !u!4 &876469907
 Transform:
   m_ObjectHideFlags: 0
@@ -2813,6 +2820,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &876469908
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 876469905}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c764fc462bfbd455daeef652d488f5f9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AAARealisticRenderer
+  enableGPUInstancing: 1
+  instancingRescanInterval: 5
+  applyPostProcessing: 1
+  sceneBrightness: 0.85
 --- !u!1001 &878721263
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -86,6 +86,28 @@ public class CameraController : MonoBehaviour
         Vector3 angles = transform.eulerAngles;
         currentX = angles.y;
         currentY = angles.x;
+
+        Camera cam = GetComponent<Camera>();
+        if (cam != null)
+        {
+            cam.farClipPlane  = 350f;  // AAA: Balance between visible + GPU (fog hides the edge)
+            cam.nearClipPlane = 0.1f;  // Prevent z-fighting close-up
+        }
+
+        // AAA Perf: Cache CharacterController once — never fetch it in LateUpdate again
+        CacheTargetComponents();
+    }
+
+    private void CacheTargetComponents()
+    {
+        if (target == null) return;
+        cachedTargetCC = target.GetComponent<CharacterController>();
+        if (cachedTargetCC != null)
+        {
+            cachedCCHeight     = cachedTargetCC.height;
+            cachedCCCenter     = cachedTargetCC.center;
+            cachedCCHeightHalf = cachedCCHeight * 0.5f;
+        }
     }
 
     [Header("AAA Smoothing")]
@@ -105,6 +127,12 @@ public class CameraController : MonoBehaviour
     private Vector3 posVelocity;
     private float currentActualDistance;
     private float distanceVelocity;
+
+    // AAA Perf: CharacterController cached once at Start — eliminates per-frame GetComponent (60x/sec)
+    private CharacterController cachedTargetCC;
+    private float cachedCCHeight;
+    private float cachedCCHeightHalf;
+    private Vector3 cachedCCCenter;
 
     void LateUpdate()
     {
@@ -132,11 +160,12 @@ public class CameraController : MonoBehaviour
         Vector3 targetPos = target.position + targetOffset;
         float dynamicDistance = distance;
         
-        CharacterController cc = target.GetComponent<CharacterController>();
-        if (cc != null)
+        // AAA Perf: Use cached CharacterController — zero GetComponent cost
+        if (cachedTargetCC == null) CacheTargetComponents();
+        if (cachedTargetCC != null)
         {
-            Vector3 worldCenter = target.TransformPoint(cc.center);
-            float worldHeight = cc.height * target.lossyScale.y;
+            Vector3 worldCenter = target.TransformPoint(cachedTargetCC.center);
+            float worldHeight = cachedTargetCC.height * target.lossyScale.y;
             targetPos = worldCenter + Vector3.up * (worldHeight * 0.1f);
             dynamicDistance = Mathf.Max(distance, worldHeight * 2.5f);
         }

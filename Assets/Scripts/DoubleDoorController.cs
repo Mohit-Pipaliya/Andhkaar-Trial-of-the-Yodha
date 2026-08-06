@@ -47,13 +47,21 @@ public class DoubleDoorController : MonoBehaviour
     {
         if (openDoorUI != null) openDoorUI.SetActive(false);
 
+        if (doorAudioSource == null)
+        {
+            doorAudioSource = gameObject.GetComponent<AudioSource>();
+            if (doorAudioSource == null && (doorOpenSound != null || doorCloseSound != null))
+            {
+                doorAudioSource = gameObject.AddComponent<AudioSource>();
+            }
+        }
+
         if (doorAudioSource != null)
         {
-            // Force 3D spatial audio for realistic sound positioning
-            doorAudioSource.spatialBlend = 1f; 
-            doorAudioSource.minDistance = 2f;
-            doorAudioSource.maxDistance = 15f;
-            doorAudioSource.rolloffMode = AudioRolloffMode.Logarithmic;
+            // Force 2D sound so it is 100% audible everywhere and doesn't get muffled by weird listener distances
+            doorAudioSource.spatialBlend = 0f; 
+            doorAudioSource.volume = 1f;
+            doorAudioSource.bypassEffects = true;
         }
 
         if (leftDoor != null)
@@ -126,6 +134,15 @@ public class DoubleDoorController : MonoBehaviour
                     doorAudioSource.pitch = 1f + Random.Range(-pitchRandomness, pitchRandomness);
                     doorAudioSource.PlayOneShot(doorCloseSound);
                 }
+                else if (doorAudioSource != null && doorAudioSource.clip != null)
+                {
+                    doorAudioSource.pitch = 1f + Random.Range(-pitchRandomness, pitchRandomness);
+                    doorAudioSource.Play();
+                }
+                else if (doorCloseSound == null)
+                {
+                    Debug.LogError("[DoubleDoorController] DOOR CLOSE SOUND MISSING! Please assign 'doorCloseSound' in the Inspector or add a clip to the AudioSource.");
+                }
             }
         }
 
@@ -141,6 +158,15 @@ public class DoubleDoorController : MonoBehaviour
                 {
                     doorAudioSource.pitch = 1f + Random.Range(-pitchRandomness, pitchRandomness);
                     doorAudioSource.PlayOneShot(doorOpenSound);
+                }
+                else if (doorAudioSource != null && doorAudioSource.clip != null)
+                {
+                    doorAudioSource.pitch = 1f + Random.Range(-pitchRandomness, pitchRandomness);
+                    doorAudioSource.Play();
+                }
+                else
+                {
+                    Debug.LogError("[DoubleDoorController] DOOR OPEN SOUND MISSING! Please assign 'doorOpenSound' in the Inspector or add a clip to the AudioSource.");
                 }
                 if (openDoorUI != null) openDoorUI.SetActive(false);
             }

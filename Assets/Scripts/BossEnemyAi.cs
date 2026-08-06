@@ -41,6 +41,25 @@ public class BossEnemyAi : MonoBehaviour
     private GameObject proceduralArena;
     public bool isDead = false;
 
+    // AAA Perf: Pre-computed squared radii — eliminates sqrt every frame
+    private float sqrTriggerRadius;
+    private float sqrAttackRange;
+
+    // AAA Perf: NavMesh destination throttle — only update when player moves >1.5m
+    private Vector3 lastSetDestination = Vector3.positiveInfinity;
+    private const float SqrDestinationThreshold = 2.25f; // 1.5m * 1.5m
+
+    void OnEnable()
+    {
+        if (!isDead)
+            EnemyRegistry.Register(transform);
+    }
+
+    void OnDisable()
+    {
+        EnemyRegistry.Unregister(transform);
+    }
+
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
@@ -75,15 +94,20 @@ public class BossEnemyAi : MonoBehaviour
             if (playerObj != null)
                 player = playerObj.transform;
         }
+
+        // AAA Perf: Pre-compute squared radii once — avoid sqrt every frame
+        sqrTriggerRadius = triggerRadius * triggerRadius;
+        sqrAttackRange   = attackRange   * attackRange;
     }
 
     void Update()
     {
         if (isDead || player == null || currentHealth <= 0) return;
 
-        float distanceToPlayer = Vector3.Distance(transform.position, player.position);
+        // AAA Perf: sqrMagnitude instead of Distance (no sqrt = ~3x faster)
+        float sqrDist = (transform.position - player.position).sqrMagnitude;
 
-        if (!isPlayerInArena && distanceToPlayer <= triggerRadius)
+        if (!isPlayerInArena && sqrDist <= sqrTriggerRadius)
         {
             isPlayerInArena = true;
             PlaySound(roarSound);
@@ -92,11 +116,11 @@ public class BossEnemyAi : MonoBehaviour
         }
 
         // State change logic
-        if (distanceToPlayer <= attackRange)
+        if (sqrDist <= sqrAttackRange)
         {
             currentState = EnemyState.Attacking;
         }
-        else if (distanceToPlayer <= triggerRadius)
+        else if (sqrDist <= sqrTriggerRadius)
         {
             currentState = EnemyState.Chasing;
             if (!hasRoared)
@@ -137,9 +161,8 @@ public class BossEnemyAi : MonoBehaviour
                 agent.speed = 0f; 
             }
 
-            // Lerp speed to make it smooth
-            float currentAnimSpeed = animator.GetFloat("Speed");
-            animator.SetFloat("Speed", Mathf.Lerp(currentAnimSpeed, targetSpeed, Time.deltaTime * 5f));
+            // AAA Perf: Animator built-in dampTime — eliminates manual GetFloat call every frame
+            animator.SetFloat("Speed", targetSpeed, 0.1f, Time.deltaTime);
             animator.SetBool("IsAlert", isAlert);
         }
 
@@ -176,7 +199,13 @@ public class BossEnemyAi : MonoBehaviour
     void ChasePlayer()
     {
         agent.isStopped = false;
-        agent.SetDestination(player.position);
+        // AAA Perf: Only update NavMesh path when player moves >1.5m — saves pathfinding cost
+        float sqrDelta = (player.position - lastSetDestination).sqrMagnitude;
+        if (sqrDelta > SqrDestinationThreshold)
+        {
+            agent.SetDestination(player.position);
+            lastSetDestination = player.position;
+        }
     }
 
     void AttackPlayer()
@@ -212,9 +241,9 @@ public class BossEnemyAi : MonoBehaviour
         
         if (isDead || player == null) yield break;
 
-        float distance = Vector3.Distance(transform.position, player.position);
+        float sqrDist = (transform.position - player.position).sqrMagnitude;
         
-        if (distance <= attackRange + 1.5f)
+        if (sqrDist <= (attackRange + 1.5f) * (attackRange + 1.5f))
         {
             PlayerController pc = player.GetComponent<PlayerController>();
             if (pc != null)
