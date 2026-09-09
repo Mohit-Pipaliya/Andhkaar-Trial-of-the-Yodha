@@ -151,11 +151,16 @@ public class AAARealisticRenderer : MonoBehaviour
         }
         profile = globalVolume.profile;
 
-        ApplyColorGrading();
+        // ApplyColorGrading(); // Disabled per user request to keep lighting natural
         ApplyBloom();
         ApplyVignette();
         ApplyWhiteBalance();
         ApplyFilmGrain();
+        // Blur effects removed based on user request
+        // ApplyMotionBlur();
+        // ApplyDepthOfField();
+        ApplyChromaticAberration();
+        ApplyLensDistortion();
 
         Debug.Log("AAARealisticRenderer: Post-processing applied — cinematic look active.");
     }
@@ -170,19 +175,19 @@ public class AAARealisticRenderer : MonoBehaviour
             ca = profile.Add<ColorAdjustments>(true);
 
         ca.active = true;
-        ca.postExposure.Override(0f);        // NO exposure change — scene stays at natural brightness
-        ca.contrast.Override(8f);            // Very subtle contrast bump
-        ca.colorFilter.Override(new Color(0.97f, 0.95f, 1.0f)); // Barely-noticeable cool tint
-        ca.saturation.Override(-5f);         // Slight desaturation for gritty look
+        ca.postExposure.Override(-0.15f);    // Slightly darken ambient to make local lights pop
+        ca.contrast.Override(28f);           // Strong contrast for true AAA depth and hiding flat geometry
+        ca.colorFilter.Override(new Color(0.95f, 0.95f, 1.0f)); // Subtle cool moonlight tint
+        ca.saturation.Override(-15f);        // Gritty, desaturated dark fantasy look
 
-        // Lift/Gamma/Gain: warm shadows, cool highlights
+        // Lift/Gamma/Gain: Deep dark shadows, stark highlights
         if (!profile.TryGet<LiftGammaGain>(out LiftGammaGain lgg))
             lgg = profile.Add<LiftGammaGain>(true);
 
         lgg.active = true;
-        lgg.lift.Override(new Vector4(1.02f, 0.98f, 0.96f, 0f));    // Warm shadows — W=0, no brightness change
-        lgg.gamma.Override(new Vector4(0.99f, 0.99f, 1.01f, 0.0f)); // Neutral midtones
-        lgg.gain.Override(new Vector4(0.97f, 0.98f, 1.04f, 1.0f));  // Cool highlights
+        lgg.lift.Override(new Vector4(1.0f, 1.0f, 1.05f, -0.05f));  // Darker, slightly cooler shadows
+        lgg.gamma.Override(new Vector4(1.0f, 1.0f, 1.0f, 0.0f));    // Neutral midtones
+        lgg.gain.Override(new Vector4(1.05f, 1.0f, 0.95f, 0.05f));  // Warmer, brighter highlights (makes torches pop)
     }
 
     /// <summary>
@@ -243,5 +248,66 @@ public class AAARealisticRenderer : MonoBehaviour
         grain.type.Override(FilmGrainLookup.Thin1);
         grain.intensity.Override(0.12f);  // Very subtle — you feel it more than see it
         grain.response.Override(0.85f);
+    }
+
+    /// <summary>
+    /// Motion Blur: Smooths out fast movements, AAA standard for 30-60 FPS targets.
+    /// </summary>
+    private void ApplyMotionBlur()
+    {
+        if (!profile.TryGet<MotionBlur>(out MotionBlur mb))
+            mb = profile.Add<MotionBlur>(true);
+
+        mb.active = true;
+        mb.mode.Override(MotionBlurMode.CameraAndObjects);
+        mb.quality.Override(MotionBlurQuality.Medium);
+        mb.intensity.Override(0.35f); // Subtle but effective
+        mb.clamp.Override(0.05f);
+    }
+
+    /// <summary>
+    /// Depth of Field: Blurs the distant background to focus on the immediate surroundings/player.
+    /// Great for hiding distant low-poly geometry and increasing immersion.
+    /// </summary>
+    private void ApplyDepthOfField()
+    {
+        if (!profile.TryGet<DepthOfField>(out DepthOfField dof))
+            dof = profile.Add<DepthOfField>(true);
+
+        dof.active = true;
+        dof.mode.Override(DepthOfFieldMode.Gaussian);
+        dof.gaussianStart.Override(15f); // Start blurring past 15 meters
+        dof.gaussianEnd.Override(80f);   // Max blur at 80 meters
+        dof.gaussianMaxRadius.Override(1.2f); // Gentle blur
+        dof.highQualitySampling.Override(false); // Optimization
+    }
+
+    /// <summary>
+    /// Chromatic Aberration: Simulates slight color fringing on the edges of the lens.
+    /// High-end AAA games use this heavily for cinematic realism.
+    /// </summary>
+    private void ApplyChromaticAberration()
+    {
+        if (!profile.TryGet<ChromaticAberration>(out ChromaticAberration ca))
+            ca = profile.Add<ChromaticAberration>(true);
+
+        ca.active = true;
+        ca.intensity.Override(0.15f); // Keep it subtle so it doesn't cause eye strain
+    }
+
+    /// <summary>
+    /// Lens Distortion: Simulates the slight barrel distortion of a physical camera lens.
+    /// </summary>
+    private void ApplyLensDistortion()
+    {
+        if (!profile.TryGet<LensDistortion>(out LensDistortion ld))
+            ld = profile.Add<LensDistortion>(true);
+
+        ld.active = true;
+        ld.intensity.Override(-0.1f); // Slight barrel distortion
+        ld.xMultiplier.Override(1f);
+        ld.yMultiplier.Override(1f);
+        ld.center.Override(new Vector2(0.5f, 0.5f));
+        ld.scale.Override(1.05f); // Zoom in slightly to hide edges
     }
 }

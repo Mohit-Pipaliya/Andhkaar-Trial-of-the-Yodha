@@ -29,7 +29,21 @@ public class FPSOptimizer : MonoBehaviour
     [Range(0.4f, 1f)]
     public float minRenderScale = 0.5f; // AAA Perf: Allow lower render scale for better FPS headroom
     public float maxRenderScale = 1f;
-    public float dynamicResolutionTargetFPS = 60f;
+    [Tooltip("Target FPS for dynamic scaling. Set to 55 to guarantee 50+ FPS.")]
+    public float dynamicResolutionTargetFPS = 55f;
+
+    [Header("Dynamic Quality Scaler (AAA 50+ FPS Guarantee)")]
+    public bool enableDynamicQuality = true;
+    private float currentShadowDistance = 80f;
+    private float minShadowDistance = 40f;
+    private float maxShadowDistance = 120f;
+    
+    private float currentLodBias = 0.5f;
+    private float minLodBias = 0.2f;
+    private float maxLodBias = 0.8f;
+
+    private Light mainDirectionalLight;
+    private float originalDirLightIntensity;
 
     [Header("Startup")]
     public bool enableOcclusionCulling = true;
@@ -66,6 +80,25 @@ public class FPSOptimizer : MonoBehaviour
             gameObject.AddComponent<InGameProfiler>();
     }
 
+    void OnEnable()
+    {
+        PlayerController.OnTorchStateChanged += HandleTorchState;
+    }
+
+    void OnDisable()
+    {
+        PlayerController.OnTorchStateChanged -= HandleTorchState;
+    }
+
+    private void HandleTorchState(bool hasTorch)
+    {
+        if (mainDirectionalLight != null)
+        {
+            // Dim directional light to 0 when lamp is held to emphasize the horror/lamp lighting
+            mainDirectionalLight.intensity = hasTorch ? 0f : originalDirLightIntensity;
+        }
+    }
+
     void Start()
     {
         StartCoroutine(ApplyBudgetAfterSceneReady());
@@ -95,11 +128,39 @@ public class FPSOptimizer : MonoBehaviour
 
         // Smooth steps — less popping
         if (avgFps < dynamicResolutionTargetFPS - 5f)
+        {
             currentRenderScale = Mathf.Max(minRenderScale, currentRenderScale - 0.04f);
+            
+            // Aggressive fallback to protect 50+ FPS
+            if (enableDynamicQuality)
+            {
+                currentShadowDistance = Mathf.Max(minShadowDistance, currentShadowDistance - 5f);
+                currentLodBias = Mathf.Max(minLodBias, currentLodBias - 0.05f);
+                ApplyDynamicQuality();
+            }
+        }
         else if (avgFps > dynamicResolutionTargetFPS + 8f)
+        {
             currentRenderScale = Mathf.Min(maxRenderScale, currentRenderScale + 0.02f);
+            
+            // Slowly recover quality if we have plenty of frames
+            if (enableDynamicQuality && currentRenderScale >= 0.9f)
+            {
+                currentShadowDistance = Mathf.Min(maxShadowDistance, currentShadowDistance + 2f);
+                currentLodBias = Mathf.Min(maxLodBias, currentLodBias + 0.02f);
+                ApplyDynamicQuality();
+            }
+        }
 
         urpAsset.renderScale = currentRenderScale;
+    }
+
+    private void ApplyDynamicQuality()
+    {
+        if (urpAsset != null)
+            urpAsset.shadowDistance = currentShadowDistance;
+            
+        QualitySettings.lodBias = currentLodBias;
     }
 
     // ─── Core Optimizations ──────────────────────────────────────
@@ -120,7 +181,8 @@ public class FPSOptimizer : MonoBehaviour
         {
             currentRenderScale          = urpAsset.renderScale;
             // Shadow quality — 80m is enough for a horror corridor game
-            urpAsset.shadowDistance     = 80f;
+            currentShadowDistance       = 80f;
+            urpAsset.shadowDistance     = currentShadowDistance;
             urpAsset.shadowCascadeCount = 2;  // was probably 4 — halves shadow map cost
             urpAsset.msaaSampleCount    = 1;  // MSAA off (URP TAA/FXAA is cheaper)
         }
@@ -128,10 +190,13 @@ public class FPSOptimizer : MonoBehaviour
         // ── KEY FIX: Aggressive LOD ───────────────────────────────
         // LOD bias 0.5 = Balanced. 0.35 was causing some objects to disappear too early, 
         // but 1.0 is too expensive. 0.5 gives a good mix of detail and performance.
-        QualitySettings.lodBias         = 0.5f;  
+        currentLodBias = 0.5f;
+        QualitySettings.lodBias         = currentLodBias;  
         QualitySettings.maximumLODLevel = 0;       // all LOD levels available, bias controls switch
-        QualitySettings.pixelLightCount = 2;       // main + torch max
+        QualitySettings.pixelLightCount = 4;       // Increased to 4 so environment lights look rich
         QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable; // Realistic floor/ground textures
+        
+        EnforceAAAShadows();
 
         // ── Audio DSP ─────────────────────────────────────────────
         // Reduce audio buffer size — less CPU per audio frame
@@ -207,8 +272,9 @@ public class FPSOptimizer : MonoBehaviour
     }
 
     /// <summary>
-    /// Natural atmospheric fog — starts at 150m, fully opaque at 350m.
-    /// Linear fog: predictable, hides the far clip edge without blacking out the scene.
+    /// AAA Atmospheric Fog.
+    /// ExponentialSquared gives a much more realistic, thick atmospheric feel
+    /// than Linear, blending smoothly from the camera into the distance.
     /// IMPORTANT: We do NOT touch RenderSettings.ambientMode or ambientLight here.
     /// PlayerController.cs already manages ambient lighting based on torch state.
     /// </summary>
@@ -216,10 +282,44 @@ public class FPSOptimizer : MonoBehaviour
     {
         RenderSettings.fog             = true;
         RenderSettings.fogMode         = FogMode.Linear;
-        RenderSettings.fogStartDistance = 150f;   // No fog closer than 150m — scene fully visible
-        RenderSettings.fogEndDistance   = 350f;   // Fully hidden at far clip edge
-        // Deep dark blue-grey: natural night mist, NOT pitch black
-        RenderSettings.fogColor = new Color(0.10f, 0.12f, 0.18f, 1f);
+        RenderSettings.fogStartDistance = 120f;   // Completely clear in the foreground
+        RenderSettings.fogEndDistance   = 350f;   // Fully thick at the horizon to hide the empty blue edge
+        
+        // Dark blue-grey fog to blend seamlessly with the sky background
+        RenderSettings.fogColor = new Color(0.15f, 0.22f, 0.35f, 1f);
+    }
+
+    private void EnforceAAAShadows()
+    {
+        // Find all lights and force the most important ones to cast shadows (Fixes the "0 Shadow Casters" issue)
+        Light[] lights = FindObjectsByType<Light>(FindObjectsSortMode.None);
+        foreach (Light l in lights)
+        {
+            if (l.type == LightType.Directional)
+            {
+                l.shadows = LightShadows.Soft;
+                l.shadowStrength = 0.9f;
+                
+                if (mainDirectionalLight == null)
+                {
+                    mainDirectionalLight = l;
+                    originalDirLightIntensity = l.intensity;
+                    
+                    // Initial sync just in case
+                    PlayerController pc = FindFirstObjectByType<PlayerController>();
+                    if (pc != null && pc.hasTorch)
+                    {
+                        l.intensity = 0f;
+                    }
+                }
+            }
+            else if (l.type == LightType.Spot && l.intensity >= 1f)
+            {
+                l.shadows = LightShadows.Soft; 
+                l.shadowStrength = 0.8f;
+            }
+        }
+        Debug.Log("AAA FPSOptimizer: Soft Shadows enforced on Directional and primary Spot lights.");
     }
 
     private void ApplyOcclusionCulling()

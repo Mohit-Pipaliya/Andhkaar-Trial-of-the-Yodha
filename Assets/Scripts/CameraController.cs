@@ -32,6 +32,23 @@ public class CameraController : MonoBehaviour
     private float currentX = 0f;
     private float currentY = 20f;
 
+    [Header("AAA Cinematic Feel")]
+    [Tooltip("Enable subtle camera bobbing/breathing.")]
+    public bool enableCameraBob = true;
+    public float bobSpeed = 1.5f;
+    public float bobAmount = 0.05f;
+    
+    [Tooltip("Dynamic FOV based on player speed.")]
+    public bool enableDynamicFOV = true;
+    public float baseFOV = 60f;
+    public float maxSpeedFOV = 75f;
+    public float fovSmoothTime = 0.2f;
+
+    // Internal state for AAA effects
+    private Camera camComponent;
+    private float bobTimer = 0f;
+    private float currentFOVVelocity = 0f;
+
     // External shake offset (set by other scripts e.g. FlyAndCollectMechanic)
     [HideInInspector] public Vector3 shakeOffset = Vector3.zero;
 
@@ -87,11 +104,12 @@ public class CameraController : MonoBehaviour
         currentX = angles.y;
         currentY = angles.x;
 
-        Camera cam = GetComponent<Camera>();
-        if (cam != null)
+        camComponent = GetComponent<Camera>();
+        if (camComponent != null)
         {
-            cam.farClipPlane  = 350f;  // AAA: Balance between visible + GPU (fog hides the edge)
-            cam.nearClipPlane = 0.1f;  // Prevent z-fighting close-up
+            camComponent.farClipPlane  = 350f;  // AAA: Balance between visible + GPU (fog hides the edge)
+            camComponent.nearClipPlane = 0.1f;  // Prevent z-fighting close-up
+            camComponent.fieldOfView = baseFOV;
         }
 
         // AAA Perf: Cache CharacterController once — never fetch it in LateUpdate again
@@ -190,12 +208,34 @@ public class CameraController : MonoBehaviour
         // Smoothly interpolate the distance to prevent sudden snapping when walking past trees/poles
         currentActualDistance = Mathf.SmoothDamp(currentActualDistance, desiredDistance, ref distanceVelocity, 0.1f);
 
+        // --- AAA Camera Bobbing ---
+        Vector3 bobOffset = Vector3.zero;
+        if (enableCameraBob)
+        {
+            float speed = (cachedTargetCC != null) ? cachedTargetCC.velocity.magnitude : 0f;
+            float currentBobSpeed = (speed > 1f) ? bobSpeed * 2.5f : bobSpeed; // Faster bob when moving
+            float currentBobAmount = (speed > 1f) ? bobAmount * 1.5f : bobAmount;
+            
+            bobTimer += Time.deltaTime * currentBobSpeed;
+            bobOffset = new Vector3(0f, Mathf.Sin(bobTimer) * currentBobAmount, 0f);
+        }
+
         // 5. Calculate Final Position
         Vector3 finalPosition = targetPos + rotation * new Vector3(0, 0, -currentActualDistance);
-        finalPosition += shakeOffset;
+        finalPosition += shakeOffset + (rotation * bobOffset); // Apply bob in local camera space
 
         // 6. Apply Final Position & Rotation with SmoothDamp (AAA standard for removing micro-jitters)
         transform.position = Vector3.SmoothDamp(transform.position, finalPosition, ref posVelocity, positionSmoothTime);
         transform.rotation = rotation;
+
+        // --- AAA Dynamic FOV ---
+        if (enableDynamicFOV && camComponent != null)
+        {
+            float speed = (cachedTargetCC != null) ? cachedTargetCC.velocity.magnitude : 0f;
+            // Assuming max speed is around 8 for a sprint
+            float speedFactor = Mathf.Clamp01(speed / 8f);
+            float targetFOV = Mathf.Lerp(baseFOV, maxSpeedFOV, speedFactor);
+            camComponent.fieldOfView = Mathf.SmoothDamp(camComponent.fieldOfView, targetFOV, ref currentFOVVelocity, fovSmoothTime);
+        }
     }
 }
