@@ -49,11 +49,33 @@ public class DemonAi : MonoBehaviour
     {
         if (!isDead)
             EnemyRegistry.Register(transform);
+        PlayerController.OnPlayerDied += HandlePlayerDied;
+        PlayerController.OnPlayerRespawned += HandlePlayerRespawned;
     }
 
     void OnDisable()
     {
         EnemyRegistry.Unregister(transform);
+        PlayerController.OnPlayerDied -= HandlePlayerDied;
+        PlayerController.OnPlayerRespawned -= HandlePlayerRespawned;
+    }
+
+    private void HandlePlayerDied()
+    {
+        if (arenaWall != null) Destroy(arenaWall);
+        isPlayerTrapped = false;
+        currentState = State.Patrolling;
+    }
+
+    private void HandlePlayerRespawned()
+    {
+        if (arenaWall != null) Destroy(arenaWall);
+        isPlayerTrapped = false;
+        currentState = State.Patrolling;
+        if (agent != null && agent.isActiveAndEnabled && currentPatrolTarget != null)
+        {
+            agent.SetDestination(currentPatrolTarget.position);
+        }
     }
 
     void Start()
@@ -236,8 +258,8 @@ public class DemonAi : MonoBehaviour
             if (pc != null) 
             {
                 pc.TakeDamage(100f); // Player ko 100 damage
-                // Chingari player ke body (chest) ke paas udni chahiye
-                HitVFX.CreateSparks(player.position + Vector3.up * 1.2f); 
+                Vector3 clashDir = (player.position - transform.position).normalized + Vector3.up * 0.3f;
+                HitVFX.CreateSwordClashSparks(player.position + Vector3.up * 1.2f, clashDir); 
             }
         }
     }

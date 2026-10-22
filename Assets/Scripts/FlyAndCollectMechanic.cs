@@ -53,7 +53,7 @@ public class FlyAndCollectMechanic : MonoBehaviour
 
     private void Update()
     {
-        if (playerTransform == null) return;
+        if (isFlightCompleted || playerTransform == null) return;
 
         switch (currentState)
         {
@@ -74,7 +74,7 @@ public class FlyAndCollectMechanic : MonoBehaviour
 
     private void HandleIdleState()
     {
-        if (trigger1 == null) return;
+        if (isFlightCompleted || trigger1 == null) return;
 
         bool near = false;
         Collider triggerCol = trigger1.GetComponent<Collider>();
@@ -99,13 +99,13 @@ public class FlyAndCollectMechanic : MonoBehaviour
         
         isNearTrigger1 = near;
 
-        if (pressFUI != null) pressFUI.SetActive(isNearTrigger1);
+        if (pressFUI != null) AAAPressPromptAnimator.AnimatePrompt(pressFUI, isNearTrigger1);
 
         if (isNearTrigger1 && Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame)
         {
             isNearTrigger1 = false; 
             
-            if (pressFUI != null) pressFUI.SetActive(false);
+            if (pressFUI != null) AAAPressPromptAnimator.AnimatePrompt(pressFUI, false);
             
             if (charController != null) charController.enabled = false; 
             if (playerCtrl != null) playerCtrl.SetLampFreeze(true);
@@ -143,6 +143,17 @@ public class FlyAndCollectMechanic : MonoBehaviour
             {
                 if (charController != null) charController.enabled = true;
                 if (playerCtrl != null) playerCtrl.SetLampFreeze(false);
+
+                // Flight and collect completed! Never show Press F UI again.
+                isFlightCompleted = true;
+                if (pressFUI != null)
+                {
+                    AAAPressPromptAnimator.AnimatePrompt(pressFUI, false);
+                    pressFUI.SetActive(false);
+                }
+                if (pointLight != null) pointLight.enabled = false;
+                this.enabled = false; // Disable script permanently so Press F never appears again!
+                return;
             }
         }
     }
@@ -160,9 +171,11 @@ public class FlyAndCollectMechanic : MonoBehaviour
         }
     }
 
+    private bool isFlightCompleted = false;
+
     private void OnGUI()
     {
-        if (pressFUI != null) return;
+        if (pressFUI != null || isFlightCompleted) return;
 
         if (currentState == MechanicState.Idle && isNearTrigger1)
         {

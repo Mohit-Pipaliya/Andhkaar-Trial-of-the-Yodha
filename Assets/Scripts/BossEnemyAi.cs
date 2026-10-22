@@ -53,11 +53,33 @@ public class BossEnemyAi : MonoBehaviour
     {
         if (!isDead)
             EnemyRegistry.Register(transform);
+        PlayerController.OnPlayerDied += HandlePlayerDied;
+        PlayerController.OnPlayerRespawned += HandlePlayerRespawned;
     }
 
     void OnDisable()
     {
         EnemyRegistry.Unregister(transform);
+        PlayerController.OnPlayerDied -= HandlePlayerDied;
+        PlayerController.OnPlayerRespawned -= HandlePlayerRespawned;
+    }
+
+    private void HandlePlayerDied()
+    {
+        if (proceduralArena != null) Destroy(proceduralArena);
+        isPlayerInArena = false;
+        hasRoared = false;
+        currentState = EnemyState.Idle;
+        if (agent != null && agent.isActiveAndEnabled) agent.ResetPath();
+    }
+
+    private void HandlePlayerRespawned()
+    {
+        if (proceduralArena != null) Destroy(proceduralArena);
+        isPlayerInArena = false;
+        hasRoared = false;
+        currentState = EnemyState.Idle;
+        if (agent != null && agent.isActiveAndEnabled) agent.ResetPath();
     }
 
     void Start()
@@ -249,6 +271,8 @@ public class BossEnemyAi : MonoBehaviour
             if (pc != null)
             {
                 pc.TakeDamage(100f); // Boss bhi sirf 100 damage dega ab
+                Vector3 clashDir = (player.position - transform.position).normalized + Vector3.up * 0.3f;
+                HitVFX.CreateSwordClashSparks(player.position + Vector3.up * 1.2f, clashDir);
             }
         }
     }

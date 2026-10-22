@@ -72,14 +72,14 @@ public class PrayDoorUnlocker : MonoBehaviour
         {
             inTrigger1 = true;
             // Agar pehle se trigger 2 mein nahi hai, tabhi Info UI dikhao
-            if (!inTrigger2 && infoUI) infoUI.SetActive(true);
+            if (!inTrigger2 && infoUI) AAAPressPromptAnimator.AnimatePrompt(infoUI, true);
         }
         else if (trigger2Area != null && other == trigger2Area)
         {
             inTrigger2 = true;
             // Info band karo aur Action (Press P) UI dikhao
-            if (infoUI) infoUI.SetActive(false);
-            if (actionUI) actionUI.SetActive(true);
+            if (infoUI) AAAPressPromptAnimator.AnimatePrompt(infoUI, false);
+            if (actionUI) AAAPressPromptAnimator.AnimatePrompt(actionUI, true);
         }
     }
 
@@ -90,15 +90,15 @@ public class PrayDoorUnlocker : MonoBehaviour
         if (trigger1Area != null && other == trigger1Area)
         {
             inTrigger1 = false;
-            if (infoUI) infoUI.SetActive(false);
+            if (infoUI) AAAPressPromptAnimator.AnimatePrompt(infoUI, false);
         }
         else if (trigger2Area != null && other == trigger2Area)
         {
             inTrigger2 = false;
-            if (actionUI) actionUI.SetActive(false);
+            if (actionUI) AAAPressPromptAnimator.AnimatePrompt(actionUI, false);
             
             // Agar Trigger 2 se bahar aaye par abhi bhi Trigger 1 mein hai, toh wapas Info UI dikhao
-            if (inTrigger1 && infoUI) infoUI.SetActive(true);
+            if (inTrigger1 && infoUI) AAAPressPromptAnimator.AnimatePrompt(infoUI, true);
         }
     }
 
@@ -107,8 +107,8 @@ public class PrayDoorUnlocker : MonoBehaviour
         isPraying = true;
         
         // UI band kardo
-        if (infoUI) infoUI.SetActive(false);
-        if (actionUI) actionUI.SetActive(false);
+        if (infoUI) AAAPressPromptAnimator.AnimatePrompt(infoUI, false);
+        if (actionUI) AAAPressPromptAnimator.AnimatePrompt(actionUI, false);
 
         // Agar hath mein koi weapon hai toh use drop karo taaki animation sahi chale
         if (playerController != null)

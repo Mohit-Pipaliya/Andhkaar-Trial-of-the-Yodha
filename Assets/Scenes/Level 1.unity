@@ -595,6 +595,7 @@ MonoBehaviour:
   minRenderScale: 0.65
   maxRenderScale: 1
   dynamicResolutionTargetFPS: 60
+  enableDynamicQuality: 1
   enableOcclusionCulling: 1
   prewarmObjectPools: 1
   poolPrewarmEntries: []
@@ -1082,7 +1083,7 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 0.4
+  m_Intensity: 0
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -13137,12 +13138,12 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 162286251241174265, guid: 5aab652315f304ad78a2d55d685ff360, type: 3}
-      propertyPath: CameraTarget
+      propertyPath: target
       value: 
       objectReference: {fileID: 1086797327}
     - target: {fileID: 162286251241174265, guid: 5aab652315f304ad78a2d55d685ff360, type: 3}
-      propertyPath: FollowDistance
-      value: 60
+      propertyPath: distance
+      value: 40
       objectReference: {fileID: 0}
     - target: {fileID: 2428207076072462525, guid: 5aab652315f304ad78a2d55d685ff360, type: 3}
       propertyPath: m_Name

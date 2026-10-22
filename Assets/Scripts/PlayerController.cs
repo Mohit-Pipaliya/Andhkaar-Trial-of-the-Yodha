@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
+using UnityEngine.AI;
 using TMPro;
 using System;
 
@@ -204,6 +205,16 @@ public class PlayerController : MonoBehaviour
     public static event Action<float> OnOilChanged;
     public static event Action<bool> OnTorchStateChanged; // Naya event add kiya
     public static event Action OnPlayerDied;
+    public static event Action OnPlayerRespawned; // R dabane par player respawn hone ka event
+
+    [Header("Respawn Settings")]
+    [Tooltip("Player marne par kitne meter door spawn hoga")]
+    public float respawnDistance = 4.5f;
+    private Vector3 deathPosition = Vector3.zero;
+    private Coroutine deathCoroutine;
+    private Coroutine revivalRoutine;
+    // Breadcrumb trail: Player jaha se guzar chuka hai un jagaho ka track
+    private readonly System.Collections.Generic.List<Vector3> traversedPathHistory = new System.Collections.Generic.List<Vector3>(600);
 
     [Header("UI Prompts")]
     [Tooltip("Drag the GameObject/Image that shows 'Press O'")]
@@ -241,6 +252,13 @@ public class PlayerController : MonoBehaviour
     private CharacterController controller;
     private Animator animator;
     private Light sceneDirectionalLight;
+
+    // ─── Animator dirty-write cache (avoid SetBool every frame when value unchanged) ───
+    private bool _prevIsWalking  = false;
+    private bool _prevIsRunning  = false;
+    private bool _prevHasTorch   = false;
+    private bool _prevIsGrounded = true;
+    private bool isRunningAnim   = false; // Persistent across frames for hysteresis
 
     private float originalHeight;
     private Vector3 originalCenter;
@@ -396,16 +414,29 @@ public class PlayerController : MonoBehaviour
             Behaviour brain = mainCam.GetComponent("CinemachineBrain") as Behaviour;
             if (brain != null) brain.enabled = false;
 
+            // Destroy any conflicting or legacy TMPro camera controllers on mainCam
+            MonoBehaviour[] allScripts = mainCam.GetComponents<MonoBehaviour>();
+            for (int i = 0; i < allScripts.Length; i++)
+            {
+                MonoBehaviour mb = allScripts[i];
+                if (mb == null) continue;
+                string typeName = mb.GetType().FullName;
+                if (typeName != null && (typeName.Contains("TMPro.Examples.CameraController") || (typeName.EndsWith("CameraController") && typeName != typeof(CameraController).FullName)))
+                {
+                    Debug.Log($"[PlayerController] Removed legacy conflicting camera controller: {typeName}");
+                    Destroy(mb);
+                }
+            }
+
             // Add our CameraController if it's missing
             CameraController camController = mainCam.GetComponent<CameraController>();
             if (camController == null)
             {
                 camController = mainCam.gameObject.AddComponent<CameraController>();
-                camController.distance = 4.5f;
-                camController.targetOffset = new Vector3(0, 1.5f, 0);
             }
-            // Always ensure the target is this player!
+            // Always ensure the target is this player and frame immediately!
             camController.target = this.transform;
+            camController.SnapToTarget();
         }
         // -------------------------------------------------------------
         
@@ -502,6 +533,9 @@ public class PlayerController : MonoBehaviour
             Debug.LogWarning("PlayerController: UIManager scene mein nahi mila! Input by default unlock kar raha hu.");
             UIManager.isGameActive = true;
         }
+
+        // Initialize traversed path breadcrumb history with starting point
+        traversedPathHistory.Add(transform.position);
     }
 
     // Call this if you change jumpHeight or timeToApex at runtime
@@ -604,13 +638,24 @@ public class PlayerController : MonoBehaviour
     // ═══════════════════════════════════════════════════════════
     void Update()
     {
-        // Agar player mar gaya hai, to bas usko zameen par girne do, baki sab rok do!
+        // Agar player mar gaya hai, to bas usko zameen par girne do, aur R dabane par 10 meter door respawn karo!
         if (currentHealth <= 0)
         {
             if (controller != null && !controller.isGrounded)
             {
                 verticalVelocity += baseGravity * Time.deltaTime;
                 controller.Move(new Vector3(0f, verticalVelocity, 0f) * Time.deltaTime);
+            }
+            else
+            {
+                if (deathPosition == Vector3.zero)
+                    deathPosition = transform.position;
+            }
+
+            // Marne par 'R' dabane se jaha mara tha waha se 10 meter door respawn ho
+            if (IsRPressedThisFrame())
+            {
+                RespawnNearDeathPoint();
             }
             return;
         }
@@ -629,6 +674,19 @@ public class PlayerController : MonoBehaviour
 
         Vector3 inputDir = new Vector3(rawInput.x, 0f, rawInput.y).normalized;
         bool    hasInput = rawInput.sqrMagnitude > 0.01f;
+
+        // ─── BREADCRUMB TRAIL (Record visited path points) ─────
+        if (currentHealth > 0 && controller != null && controller.enabled && controller.isGrounded && Mathf.Abs(verticalVelocity) <= 1.0f && !isJumping)
+        {
+            if (traversedPathHistory.Count == 0 || Vector3.Distance(transform.position, traversedPathHistory[traversedPathHistory.Count - 1]) >= 0.8f)
+            {
+                traversedPathHistory.Add(transform.position);
+                if (traversedPathHistory.Count > 600)
+                {
+                    traversedPathHistory.RemoveAt(0);
+                }
+            }
+        }
 
         // ─── IDLE CHECK & HEALTH REGENERATION ───────────────────
         bool isIdle = !hasInput && !isAttacking && !jumpPressed && controller.isGrounded && !isSpecialActionPlaying;
@@ -746,6 +804,10 @@ public class PlayerController : MonoBehaviour
         // ─── 6. HORIZONTAL MOVEMENT (AAA Smooth) ────────────────
         Vector3 targetHorizontal = Vector3.zero;
 
+        // Compute current speed once here — used by turn smoothing AND animation section below.
+        // Uses last frame's horizontalVelocity which is fine since it's smoothed.
+        float currentHorizSpeed = new Vector3(horizontalVelocity.x, 0f, horizontalVelocity.z).magnitude;
+
         if (hasInput && !isSliding)
         {
             Vector3 moveDir = Vector3.zero;
@@ -758,21 +820,31 @@ public class PlayerController : MonoBehaviour
                 Vector3 camR = camTransform.right;   camR.y = 0f; camR.Normalize();
                 moveDir = (camF * rawInput.y + camR * rawInput.x).normalized;
 
-                // Character Rotation (AAA smooth leaning)
+                // ─── AAA Turn Speed — scales with movement speed ─────────────────
+                // Fast sprint = quick snappy turn. Slow walk = gentle lean.
+                // This matches how real bodies (and Uncharted) handle turning momentum.
+                float speedFactor = Mathf.Clamp01(currentHorizSpeed / runSpeed);
+                float effectiveTurnSpeed = Mathf.Lerp(turnSmoothSpeed * 0.4f,
+                                                       turnSmoothSpeed * 1.1f,
+                                                       speedFactor);
                 if (moveDir != Vector3.zero)
                 {
                     transform.rotation = Quaternion.Slerp(transform.rotation,
-                        Quaternion.LookRotation(moveDir), Time.deltaTime * (turnSmoothSpeed * 0.7f));
+                        Quaternion.LookRotation(moveDir), Time.deltaTime * effectiveTurnSpeed);
                 }
             }
             else
             {
                 moveDir = new Vector3(rawInput.x, 0f, rawInput.y).normalized;
-                
+
+                float speedFactor2 = Mathf.Clamp01(currentHorizSpeed / runSpeed);
+                float effectiveTurnSpeed2 = Mathf.Lerp(turnSmoothSpeed * 0.4f,
+                                                        turnSmoothSpeed * 1.1f,
+                                                        speedFactor2);
                 if (moveDir != Vector3.zero)
                 {
                     transform.rotation = Quaternion.Slerp(transform.rotation,
-                        Quaternion.LookRotation(moveDir), Time.deltaTime * (turnSmoothSpeed * 0.7f));
+                        Quaternion.LookRotation(moveDir), Time.deltaTime * effectiveTurnSpeed2);
                 }
             }
 
@@ -844,16 +916,31 @@ public class PlayerController : MonoBehaviour
         // ─── 9. ANIMATIONS ──────────────────────────────────────
         // Animation ko direct input se na chalake, actual speed se chalayenge
         // Isse jab player rukega toh moonwalking (sliding) nahi hogi.
-        float currentHorizSpeed = new Vector3(horizontalVelocity.x, 0f, horizontalVelocity.z).magnitude;
+        // (currentHorizSpeed already computed above in section 6)
         bool isMovingAnim = currentHorizSpeed > 0.3f && groundedNow && !isSliding;
-        
-        // Agar run button daba rakha hai ya speed walk speed se thodi zyada hai toh run karega
-        bool isRunningAnim = isMovingAnim && (isRunning || currentHorizSpeed > walkSpeed + 0.5f);
+
+        // ─── AAA Hysteresis: Prevents walk↔run flicker at threshold boundary ─────
+        // isRunningAnim becomes true only above (walkSpeed + 0.8) and
+        // becomes false only below (walkSpeed - 0.4) — a dead-band prevents rapid flicker.
+        if (!isRunningAnim)
+            isRunningAnim = isMovingAnim && (isRunning || currentHorizSpeed > walkSpeed + 0.8f);
+        else
+            isRunningAnim = isMovingAnim && (isRunning || currentHorizSpeed > walkSpeed - 0.4f);
+
         bool isWalkingAnim = isMovingAnim && !isRunningAnim;
 
-        animator.SetBool("IsWalking", isWalkingAnim);
-        animator.SetBool("IsRunning", isRunningAnim);
-        animator.SetBool("HasTorch",  hasTorch && activeCombatEngagements == 0);
+        // ─── Animator Speed float (drives Blend Trees & foot-sync) ──────────────
+        // Normalized: 0=Idle, 0.5=Walk, 1=Run. Avoids foot-slide at any speed.
+        float maxMoveSpeed = Mathf.Max(runSpeed, torchRunSpeed);
+        float animSpeedNorm = Mathf.Clamp01(currentHorizSpeed / maxMoveSpeed);
+
+        // Dirty-write: only push values that changed to avoid per-frame Animator overhead
+        bool hasTorchAnim = hasTorch && activeCombatEngagements == 0;
+        if (isWalkingAnim   != _prevIsWalking)  { animator.SetBool("IsWalking", isWalkingAnim);   _prevIsWalking  = isWalkingAnim; }
+        if (isRunningAnim   != _prevIsRunning)  { animator.SetBool("IsRunning", isRunningAnim);   _prevIsRunning  = isRunningAnim; }
+        if (hasTorchAnim    != _prevHasTorch)   { animator.SetBool("HasTorch",  hasTorchAnim);    _prevHasTorch   = hasTorchAnim; }
+        if (groundedNow     != _prevIsGrounded) { animator.SetBool("IsGrounded", groundedNow);    _prevIsGrounded = groundedNow; }
+        animator.SetFloat("Speed", animSpeedNorm, 0.1f, Time.deltaTime); // Damped — prevents snap
 
         // ─── 10. ITEM PICKUP (Torch & Swords) ───────────────────
         bool tryingToPickLamp = interactLampAction.triggered;
@@ -936,7 +1023,7 @@ public class PlayerController : MonoBehaviour
             {
                 // M dabaya → magic animation fire karo!
                 waitingForMagicM = false;
-                if (pressMUI != null) pressMUI.SetActive(false);
+                AAAPressPromptAnimator.AnimatePrompt(pressMUI, false);
                 ExecuteSpecialAction(pendingSpecialIndex);
             }
             else
@@ -952,8 +1039,8 @@ public class PlayerController : MonoBehaviour
                             // Step 1 — M dabaya → pressMUI band karo, pressPut1UI dikhao
                             pendingSpecialIndex = i;
                             waitingForSwordPut  = true;
-                            if (pressMUI != null)    pressMUI.SetActive(false);
-                            if (pressPut1UI != null) pressPut1UI.SetActive(true);
+                            AAAPressPromptAnimator.AnimatePrompt(pressMUI, false);
+                            AAAPressPromptAnimator.AnimatePrompt(pressPut1UI, true);
                         }
                         else
                         {
@@ -974,8 +1061,8 @@ public class PlayerController : MonoBehaviour
             waitingForMagicM   = true;            // Ab M dabane ka wait karo
 
             // pressPut1UI band karo, pressMUI wapas dikhao — player M dabayega magic ke liye
-            if (pressPut1UI != null) pressPut1UI.SetActive(false);
-            if (pressMUI != null)    pressMUI.SetActive(true);
+            AAAPressPromptAnimator.AnimatePrompt(pressPut1UI, false);
+            AAAPressPromptAnimator.AnimatePrompt(pressMUI, true);
         }
 
         UpdateInteractUI(groundedNow);
@@ -1341,14 +1428,19 @@ public class PlayerController : MonoBehaviour
 
         if (currentHealth <= 0)
         {
-            animator.SetTrigger("Die"); // Marne ka animation
-            // this.enabled = false; // Yahan disable mat karo warna coroutine stop ho jayega
-            StartCoroutine(DelayGameOver()); // Game over screen me delay taaki animation poora ho
+            deathPosition = transform.position;
+            if (animator != null) animator.SetTrigger("Die"); // Marne ka animation
+            if (deathCoroutine != null) StopCoroutine(deathCoroutine);
+            deathCoroutine = StartCoroutine(DelayGameOver()); // Game over screen me delay taaki animation poora ho
         }
         else
         {
-            // Player Zinda hai, to usko Hit (Damage) ka reaction aana chahiye
-            animator.SetTrigger("Hit");
+            // Player Zinda hai, to usko Damage reaction ka animation aana chahiye
+            if (animator != null)
+            {
+                animator.ResetTrigger("TakeDamage");
+                animator.SetTrigger("TakeDamage");
+            }
             
             // Optional: Thodi der ke liye input block kar do (Stun effect)
             StartCoroutine(HitRecovery());
@@ -1364,8 +1456,280 @@ public class PlayerController : MonoBehaviour
 
     private System.Collections.IEnumerator DelayGameOver()
     {
-        yield return new WaitForSeconds(4.0f); // 4 second ka delay taaki death animation poora ho jaye
-        OnPlayerDied?.Invoke();
+        yield return new WaitForSeconds(3.5f); // 3.5 second ka delay taaki death animation poora ho jaye
+        if (currentHealth <= 0)
+        {
+            OnPlayerDied?.Invoke();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  RESPAWN SYSTEM (Press R to spawn 10m away from death point)
+    // ═══════════════════════════════════════════════════════════
+    private bool IsRPressedThisFrame()
+    {
+        if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame) return true;
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKeyDown(KeyCode.R)) return true;
+#endif
+        return false;
+    }
+
+    /// <summary>
+    /// Player marne par jaha se guzar chuka hai wahi 10 meter peeche coolest revival animation ke sath respawn karta hai.
+    /// </summary>
+    public void RespawnNearDeathPoint()
+    {
+        if (deathCoroutine != null)
+        {
+            StopCoroutine(deathCoroutine);
+            deathCoroutine = null;
+        }
+
+        Vector3 baseDeathPoint = deathPosition != Vector3.zero ? deathPosition : transform.position;
+        // Jaha se player guzar chuka hai, waha 10 meter peeche ka safe ground point dhoondhna
+        Vector3 spawnPos = FindTraversedRespawnPosition(baseDeathPoint, respawnDistance);
+
+        // 1. CharacterController disable karke firm ground position update karo
+        if (controller != null) controller.enabled = false;
+        transform.position = spawnPos;
+
+        // Death point ki taraf dekhna taaki orientation perfect rahe
+        Vector3 lookDir = (baseDeathPoint - spawnPos);
+        lookDir.y = 0f;
+        if (lookDir.sqrMagnitude > 0.01f)
+        {
+            transform.rotation = Quaternion.LookRotation(lookDir);
+        }
+
+        if (controller != null)
+        {
+            controller.enabled = true;
+            // Immediate ground snap: moves character down firmly so no floating/hovering occurs
+            controller.Move(Vector3.down * 0.35f);
+        }
+
+        // 2. Physics & Velocities reset
+        verticalVelocity = -groundSnapForce; // Firmly stick to ground on frame 1
+        horizontalVelocity = Vector3.zero;
+
+        // 3. Health restore
+        currentHealth = maxHealth;
+        OnHealthChanged?.Invoke(currentHealth);
+
+        // 4. Action and combat states reset
+        isAttacking = false;
+        isSpecialActionPlaying = false;
+        isSliding = false;
+        activeCombatEngagements = 0;
+        SetLampFreeze(false);
+
+        // Torch visual & oil restore
+        if (hasTorch)
+        {
+            if (handLampObject != null) handLampObject.SetActive(true);
+            if (handLampLight != null)
+            {
+                handLampLight.enabled = true;
+                handLampLight.intensity = maxLampIntensity;
+            }
+            OnTorchStateChanged?.Invoke(true);
+            OnOilChanged?.Invoke(maxLampIntensity);
+
+            if (lampDrainCoroutine != null) StopCoroutine(lampDrainCoroutine);
+            lampDrainCoroutine = StartCoroutine(DrainLampOil());
+        }
+
+        // Weapon visual restore
+        UpdateWeaponState(currentWeapon);
+
+        // 5. Camera Snap to new position
+        CameraController cam = FindFirstObjectByType<CameraController>();
+        if (cam != null)
+        {
+            cam.SnapToTarget();
+        }
+
+        // 6. COOLEST AAA REVIVAL ANIMATION & VFX SEQUENCE
+        RevivalVFX.Play(transform, spawnPos);
+        if (revivalRoutine != null) StopCoroutine(revivalRoutine);
+        revivalRoutine = StartCoroutine(RevivalSequenceRoutine());
+
+        // 7. Fire respawn event
+        OnPlayerRespawned?.Invoke();
+
+        Debug.Log($"[Respawn] Player successfully respawned along traversed path at {spawnPos}, {Vector3.Distance(baseDeathPoint, spawnPos):F1}m back from death location.");
+    }
+
+    private System.Collections.IEnumerator RevivalSequenceRoutine()
+    {
+        isFrozen = true;
+
+        if (animator != null)
+        {
+            animator.ResetTrigger("Die");
+            animator.ResetTrigger("TakeDamage");
+            animator.ResetTrigger("Hit");
+            animator.ResetTrigger("Attack");
+            animator.ResetTrigger("Jump");
+            animator.SetBool("IsWalking", false);
+            animator.SetBool("IsRunning", false);
+            animator.SetBool("IsSliding", false);
+            animator.SetBool("IsGrounded", true);  // New param — grounded on revival
+            animator.SetFloat("Speed", 0f);         // New param — stopped on revival
+            // Play crisp Idle stance firmly on ground (no weird floating prayer pose)
+            animator.Play("Idle", 0, 0f);
+            animator.Update(0f);
+            animator.SetInteger("WeaponType", (int)currentWeapon);
+            animator.SetBool("HasTorch", hasTorch && activeCombatEngagements == 0);
+        }
+
+        // Reset dirty-write caches so the next Update() pushes all fresh values
+        _prevIsWalking  = false;
+        _prevIsRunning  = false;
+        _prevHasTorch   = hasTorch && activeCombatEngagements == 0;
+        _prevIsGrounded = true;
+        isRunningAnim   = false;
+
+        yield return new WaitForSeconds(0.25f);
+
+        isFrozen = false;
+    }
+
+    /// <summary>
+    /// Player jaha se guzar chuka hai (traversed path history), waha se theek 4-5 meter peeche ka safe ground point dhundhta hai.
+    /// </summary>
+    public Vector3 FindTraversedRespawnPosition(Vector3 deathPos, float targetDistance)
+    {
+        if (traversedPathHistory == null || traversedPathHistory.Count == 0)
+        {
+            return FindSafeRespawnPosition(deathPos, targetDistance);
+        }
+
+        Vector3 chosenPoint = deathPos;
+        bool found = false;
+
+        // Comfortable combat respawn distance: 4.0m to 5.0m back from death location
+        float desiredDist = Mathf.Clamp(targetDistance, 3.5f, 5.0f);
+
+        // Find the traversed point that is closest to desiredDist straight-line distance from deathPos
+        float bestDiff = float.MaxValue;
+        for (int i = traversedPathHistory.Count - 1; i >= 0; i--)
+        {
+            Vector3 pt = traversedPathHistory[i];
+            float dist = Vector3.Distance(deathPos, pt);
+
+            // Prefer points that are at least 3.0m away from death point
+            if (dist >= 3.0f)
+            {
+                float diff = Mathf.Abs(dist - desiredDist);
+                if (diff < bestDiff)
+                {
+                    bestDiff = diff;
+                    chosenPoint = pt;
+                    found = true;
+                    if (diff < 0.4f) break; // Perfect match found!
+                }
+            }
+        }
+
+        // If player hasn't walked 3.0m yet, pick the furthest point they walked, or fallback safe position
+        if (!found)
+        {
+            if (traversedPathHistory.Count > 0)
+            {
+                float maxDist = 0f;
+                Vector3 furthest = deathPos;
+                for (int i = 0; i < traversedPathHistory.Count; i++)
+                {
+                    float d = Vector3.Distance(deathPos, traversedPathHistory[i]);
+                    if (d > maxDist)
+                    {
+                        maxDist = d;
+                        furthest = traversedPathHistory[i];
+                    }
+                }
+                if (maxDist >= 2.0f)
+                {
+                    chosenPoint = furthest;
+                    found = true;
+                }
+            }
+
+            if (!found)
+            {
+                return FindSafeRespawnPosition(deathPos, 4.0f);
+            }
+        }
+
+        // Snap directly to ground underneath (cast down from hip height only)
+        int groundMask = ~LayerMask.GetMask("Player", "Ignore Raycast");
+        RaycastHit groundHit;
+        if (Physics.Raycast(chosenPoint + Vector3.up * 1.0f, Vector3.down, out groundHit, 3.0f, groundMask, QueryTriggerInteraction.Ignore))
+        {
+            chosenPoint.y = groundHit.point.y;
+        }
+
+        return chosenPoint;
+    }
+
+    /// <summary>
+    /// Player jaha mara tha waha se approx distance (4m) door safe ground par spawn point dhundhta hai.
+    /// </summary>
+    public Vector3 FindSafeRespawnPosition(Vector3 deathPos, float distance)
+    {
+        distance = Mathf.Clamp(distance, 3.5f, 5.0f);
+        float randomBaseAngle = UnityEngine.Random.Range(0f, 360f);
+        int angleSteps = 16;
+        float angleIncrement = 360f / angleSteps;
+        int groundMask = ~LayerMask.GetMask("Player", "Ignore Raycast");
+
+        Vector3 bestCandidate = deathPos;
+        bool foundSafePosition = false;
+
+        for (int i = 0; i < angleSteps; i++)
+        {
+            float currentAngle = (randomBaseAngle + i * angleIncrement) * Mathf.Deg2Rad;
+            Vector3 direction = new Vector3(Mathf.Sin(currentAngle), 0f, Mathf.Cos(currentAngle));
+            Vector3 candidatePos = deathPos + direction * distance;
+
+            // NavMesh check: kya ye candidate position NavMesh par walkable hai?
+            bool hasNavMesh = false;
+            NavMeshHit navHit;
+            if (NavMesh.SamplePosition(candidatePos, out navHit, 3.0f, NavMesh.AllAreas))
+            {
+                candidatePos = navHit.position;
+                hasNavMesh = true;
+            }
+
+            // Raycast downward from close above ground (not high up) to avoid ceiling/archway collision
+            RaycastHit groundHit;
+            Vector3 rayStart = candidatePos + Vector3.up * 1.5f;
+            if (Physics.Raycast(rayStart, Vector3.down, out groundHit, 4.0f, groundMask, QueryTriggerInteraction.Ignore))
+            {
+                candidatePos.y = groundHit.point.y;
+            }
+            else if (!hasNavMesh)
+            {
+                continue;
+            }
+
+            bestCandidate = candidatePos;
+            foundSafePosition = true;
+            break;
+        }
+
+        if (!foundSafePosition)
+        {
+            bestCandidate = deathPos - transform.forward * distance;
+            RaycastHit groundHit;
+            if (Physics.Raycast(bestCandidate + Vector3.up * 1.5f, Vector3.down, out groundHit, 4.0f, groundMask, QueryTriggerInteraction.Ignore))
+            {
+                bestCandidate.y = groundHit.point.y;
+            }
+        }
+
+        return bestCandidate;
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -1745,8 +2109,14 @@ public class PlayerController : MonoBehaviour
         // Fire the trigger — animation will play at attackAnimSpeed
         animator.SetTrigger("Attack");
 
-        // Calculate how long this attack animation actually takes at given speed
-        // We use AnimatorStateInfo if we can, otherwise estimate from clip length
+        // Start auto-sampling the clip length for this combo step (if not yet cached)
+        bool needsSample = (currentComboStep == 1 && _attackClipLen1 <= 0f)
+                        || (currentComboStep == 2 && _attackClipLen2 <= 0f)
+                        || (currentComboStep == 3 && _attackClipLen3 <= 0f);
+        if (needsSample)
+            StartCoroutine(SampleAttackClipLength(currentComboStep));
+
+        // Use best-known clip length (cached or fallback)
         float clipLength = GetCurrentAttackClipLength();
         float attackDuration = clipLength / attackAnimSpeed;
 
@@ -1759,15 +2129,46 @@ public class PlayerController : MonoBehaviour
     /// </summary>
     private float GetCurrentAttackClipLength()
     {
-        // Give animator one frame to start the transition, then read
+        // BUG FIX: Animator hasn't transitioned yet on the same frame as SetTrigger.
+        // Reading GetCurrentAnimatorClipInfo(0) here always returns the PRE-attack state's clip.
+        // Solution: Use known combo step to return pre-measured lengths instead.
+        // Measure these once in the Unity Animation window and update below if clips change.
+        switch (currentComboStep)
+        {
+            case 1: return _attackClipLen1 > 0f ? _attackClipLen1 : 0.65f; // Sword Attack 1
+            case 2: return _attackClipLen2 > 0f ? _attackClipLen2 : 0.60f; // Sword Attack 2
+            case 3: return _attackClipLen3 > 0f ? _attackClipLen3 : 0.80f; // Attack 3 (Sword Fight One)
+            default: return 0.65f;
+        }
+    }
+
+    // ─── Attack clip lengths (auto-sampled on first use per combo step) ────────────
+    // These are measured once at runtime by reading the clip AFTER the transition completes.
+    // They cache and never need to be set manually.
+    private float _attackClipLen1 = 0f;
+    private float _attackClipLen2 = 0f;
+    private float _attackClipLen3 = 0f;
+
+    private System.Collections.IEnumerator SampleAttackClipLength(int step)
+    {
+        // Wait 2 frames for the Animator to fully transition into the attack state
+        yield return null;
+        yield return null;
+
         AnimatorClipInfo[] clips = animator.GetCurrentAnimatorClipInfo(0);
         foreach (var info in clips)
         {
+            if (info.clip == null) continue;
             string name = info.clip.name.ToLower();
-            if (name.Contains("attack") || name.Contains("punch") || name.Contains("slash"))
-                return info.clip.length;
+            if (name.Contains("attack") || name.Contains("sword") || name.Contains("slash") || name.Contains("fight"))
+            {
+                float len = info.clip.length;
+                if (step == 1) _attackClipLen1 = len;
+                else if (step == 2) _attackClipLen2 = len;
+                else if (step == 3) _attackClipLen3 = len;
+                break;
+            }
         }
-        return 0.65f; // Safe fallback — adjust if your clip is longer/shorter
     }
 
     private System.Collections.IEnumerator AttackRecovery(float duration)
@@ -1940,12 +2341,12 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        if (pressOUI != null) pressOUI.SetActive(showO);
-        if (pressEUI != null) pressEUI.SetActive(showE);
+        AAAPressPromptAnimator.AnimatePrompt(pressOUI, showO);
+        AAAPressPromptAnimator.AnimatePrompt(pressEUI, showE);
         // pressMUI: normal zone mein dikhe, ya jab sword rakh ke M press ka wait ho
-        if (pressMUI != null)    pressMUI.SetActive((showM && !waitingForSwordPut) || waitingForMagicM);
+        AAAPressPromptAnimator.AnimatePrompt(pressMUI, (showM && !waitingForSwordPut) || waitingForMagicM);
         // pressPut1UI: sirf sword-put wait mode mein dikhao, baaki time band
-        if (pressPut1UI != null) pressPut1UI.SetActive(waitingForSwordPut);
+        AAAPressPromptAnimator.AnimatePrompt(pressPut1UI, waitingForSwordPut);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -1977,7 +2378,7 @@ public class PlayerController : MonoBehaviour
 
     public void ShowInteractUI(bool show)
     {
-        if (pressEUI != null) pressEUI.SetActive(show);
+        AAAPressPromptAnimator.AnimatePrompt(pressEUI, show);
     }
 
     public void HealFull()

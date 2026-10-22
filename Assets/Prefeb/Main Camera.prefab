@@ -147,20 +147,27 @@ MonoBehaviour:
   m_GameObject: {fileID: 2428207076072462525}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2d687537154440a3913a9a3c7977978c, type: 3}
+  m_Script: {fileID: 11500000, guid: 5f18481f916f14db595e4fd8b567bba2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraController
-  CameraTarget: {fileID: 0}
-  FollowDistance: 30
-  MaxFollowDistance: 100
-  MinFollowDistance: 2
-  ElevationAngle: 30
-  MaxElevationAngle: 85
-  MinElevationAngle: 0
-  OrbitalAngle: 0
-  CameraMode: 0
-  MovementSmoothing: 1
-  RotationSmoothing: 0
-  MovementSmoothingValue: 25
-  RotationSmoothingValue: 5
-  MoveSensitivity: 2
+  target: {fileID: 0}
+  targetOffset: {x: 0, y: 0, z: 0}
+  distance: 40
+  minDistance: 14
+  smoothSpeed: 15
+  collisionMask:
+    serializedVersion: 2
+    m_Bits: 0
+  sensitivity: 1.5
+  yMinLimit: -20
+  yMaxLimit: 75
+  enableCameraBob: 0
+  bobSpeed: 1.5
+  bobAmount: 0.05
+  enableDynamicFOV: 1
+  baseFOV: 60
+  maxSpeedFOV: 70
+  fovSmoothTime: 0.25
+  rotationSmoothTime: 0.04
+  positionSmoothTime: 0.03
+  shoulderOffset: {x: 0, y: 0, z: 0}

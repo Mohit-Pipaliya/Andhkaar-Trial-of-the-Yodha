@@ -40,10 +40,13 @@ public class SwordDamage : MonoBehaviour
         DemonAi enemy = other.GetComponent<DemonAi>();
         if (enemy == null) enemy = other.GetComponentInParent<DemonAi>();
 
+        Vector3 hitPoint = other.ClosestPoint(transform.position);
+        Vector3 clashNormal = (transform.position - other.transform.position).normalized + Vector3.up * 0.4f;
+
         if (enemy != null)
         {
             enemy.TakeDamage(damageAmount);
-            HitVFX.CreateSparks(other.ClosestPoint(transform.position)); // Chingari effect
+            HitVFX.CreateSwordClashSparks(hitPoint, clashNormal);
             Debug.Log("<color=cyan>Sword Collider ne Enemy ko " + damageAmount + " damage diya!</color>");
             lastHitTime = Time.time;
         }
@@ -56,7 +59,7 @@ public class SwordDamage : MonoBehaviour
             if (enemyNoPatrol != null)
             {
                 enemyNoPatrol.TakeDamage(damageAmount);
-                HitVFX.CreateSparks(other.ClosestPoint(transform.position)); // Chingari effect
+                HitVFX.CreateSwordClashSparks(hitPoint, clashNormal);
                 Debug.Log("<color=cyan>Sword Collider ne Stationary Enemy ko " + damageAmount + " damage diya!</color>");
                 lastHitTime = Time.time;
             }
@@ -68,7 +71,7 @@ public class SwordDamage : MonoBehaviour
                 if (boss != null)
                 {
                     boss.TakeDamage(300); // Player boss ko seedha 300 damage dega ek hit me
-                    HitVFX.CreateSparks(other.ClosestPoint(transform.position)); // Chingari effect
+                    HitVFX.CreateSwordClashSparks(hitPoint, clashNormal);
                     Debug.Log("<color=cyan>Sword Collider ne Boss ko 300 damage diya!</color>");
                     lastHitTime = Time.time;
                 }

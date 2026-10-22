@@ -68,6 +68,7 @@ public class UIManager : MonoBehaviour
         PlayerController.OnOilChanged += UpdateOilSmooth;
         PlayerController.OnTorchStateChanged += ToggleOilSlider;
         PlayerController.OnPlayerDied += TriggerGameOver;
+        PlayerController.OnPlayerRespawned += HandlePlayerRespawn;
     }
 
     private void OnDisable()
@@ -77,6 +78,7 @@ public class UIManager : MonoBehaviour
         PlayerController.OnOilChanged -= UpdateOilSmooth;
         PlayerController.OnTorchStateChanged -= ToggleOilSlider;
         PlayerController.OnPlayerDied -= TriggerGameOver;
+        PlayerController.OnPlayerRespawned -= HandlePlayerRespawn;
     }
 
     private void Start()
@@ -144,10 +146,10 @@ public class UIManager : MonoBehaviour
         if (oilLampSlider != null)
             oilLampSlider.value = Mathf.Lerp(oilLampSlider.value, targetOil, Time.unscaledDeltaTime * 5f);
 
-        // R dabane par restart logic
-        if (gameOverPanel != null && gameOverPanel.activeSelf && Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame)
+        // R dabane par respawn / restart logic
+        if (((gameOverPanel != null && gameOverPanel.activeSelf) || isGameOver) && IsRPressedThisFrame())
         {
-            RestartGame();
+            RespawnPlayer();
         }
 
         // ESC dabane par Pause / Resume
@@ -161,53 +163,78 @@ public class UIManager : MonoBehaviour
     }
 
     // ================= HELPER: FADE ANIMATIONS =================
+    private System.Collections.Generic.Dictionary<GameObject, Coroutine> activeFadeRoutines = new System.Collections.Generic.Dictionary<GameObject, Coroutine>();
+
     private void ShowPanel(GameObject panel, bool animate = true)
     {
         if (panel == null) return;
+
+        if (activeFadeRoutines.TryGetValue(panel, out Coroutine existing) && existing != null)
+        {
+            StopCoroutine(existing);
+            activeFadeRoutines.Remove(panel);
+        }
+
         panel.SetActive(true);
         panel.transform.SetAsLastSibling(); // Bring panel to the front to prevent Raycast blocking
         
+        CanvasGroup cg = panel.GetComponent<CanvasGroup>();
+        if (cg == null) cg = panel.AddComponent<CanvasGroup>();
+
         if (animate)
         {
-            CanvasGroup cg = panel.GetComponent<CanvasGroup>();
-            if (cg == null) cg = panel.AddComponent<CanvasGroup>();
             cg.alpha = 0f;
-            StartCoroutine(FadeCanvasGroup(cg, 0f, 1f, uiFadeSpeed));
+            activeFadeRoutines[panel] = StartCoroutine(FadeCanvasGroup(cg, 0f, 1f, uiFadeSpeed, panel));
+        }
+        else
+        {
+            cg.alpha = 1f;
         }
     }
 
     private void HidePanel(GameObject panel, bool animate = true)
     {
-        if (panel == null || !panel.activeSelf) return;
-        
-        if (animate)
+        if (panel == null) return;
+
+        if (activeFadeRoutines.TryGetValue(panel, out Coroutine existing) && existing != null)
         {
-            CanvasGroup cg = panel.GetComponent<CanvasGroup>();
+            StopCoroutine(existing);
+            activeFadeRoutines.Remove(panel);
+        }
+
+        CanvasGroup cg = panel.GetComponent<CanvasGroup>();
+        if (animate && panel.activeSelf)
+        {
             if (cg == null) cg = panel.AddComponent<CanvasGroup>();
-            StartCoroutine(FadeCanvasGroupAndHide(cg, panel, uiFadeSpeed));
+            activeFadeRoutines[panel] = StartCoroutine(FadeCanvasGroupAndHide(cg, panel, uiFadeSpeed));
         }
         else
         {
+            if (cg != null) cg.alpha = 0f;
             panel.SetActive(false);
         }
     }
 
-    private IEnumerator FadeCanvasGroup(CanvasGroup cg, float start, float end, float duration)
+    private IEnumerator FadeCanvasGroup(CanvasGroup cg, float start, float end, float duration, GameObject panel = null)
     {
         float time = 0f;
         while (time < duration)
         {
             time += Time.unscaledDeltaTime; // Unscaled so it animates even when Time.timeScale is 0
-            cg.alpha = Mathf.Lerp(start, end, time / duration);
+            if (cg != null) cg.alpha = Mathf.Lerp(start, end, time / duration);
             yield return null;
         }
-        cg.alpha = end;
+        if (cg != null) cg.alpha = end;
+        if (panel != null && activeFadeRoutines.ContainsKey(panel))
+            activeFadeRoutines.Remove(panel);
     }
 
     private IEnumerator FadeCanvasGroupAndHide(CanvasGroup cg, GameObject panel, float duration)
     {
-        yield return StartCoroutine(FadeCanvasGroup(cg, cg.alpha, 0f, duration));
-        panel.SetActive(false);
+        yield return StartCoroutine(FadeCanvasGroup(cg, cg != null ? cg.alpha : 1f, 0f, duration, panel));
+        if (panel != null) panel.SetActive(false);
+        if (panel != null && activeFadeRoutines.ContainsKey(panel))
+            activeFadeRoutines.Remove(panel);
     }
 
     // ================= 1. Loading Screen =================
@@ -376,14 +403,103 @@ public class UIManager : MonoBehaviour
         HidePanel(gamePlayPanel, true);
         ShowPanel(gameOverPanel, true);
 
+        // Auto trigger AAA animation for Press R prompt inside GameOver panel
+        if (gameOverPanel != null)
+        {
+            TextMeshProUGUI[] tmps = gameOverPanel.GetComponentsInChildren<TextMeshProUGUI>(true);
+            foreach (var t in tmps)
+            {
+                if (t != null && (t.gameObject.name.ToLower().Contains("press") || t.text.ToLower().Contains("press")))
+                {
+                    AAAPressPromptAnimator.AnimatePrompt(t.gameObject, true);
+                }
+            }
+        }
+
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
     }
 
     public void RestartGame()
     {
+        // Agar player mar chuka hai, toh naye rule ke mutabiq 10 meter door respawn karo
+        PlayerController player = FindFirstObjectByType<PlayerController>();
+        if (player != null && player.currentHealth <= 0)
+        {
+            player.RespawnNearDeathPoint();
+            return;
+        }
+
         Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void RespawnPlayer()
+    {
+        PlayerController player = FindFirstObjectByType<PlayerController>();
+        if (player != null)
+        {
+            player.RespawnNearDeathPoint();
+        }
+        else
+        {
+            RestartGame();
+        }
+    }
+
+    private void HandlePlayerRespawn()
+    {
+        isGameOver = false;
+        isGamePaused = false;
+        isGameActive = true;
+        Time.timeScale = 1f;
+
+        HidePanel(gameOverPanel, false);
+        if (gameOverPanel != null) gameOverPanel.SetActive(false);
+
+        ShowPanel(gamePlayPanel, false);
+        if (gamePlayPanel != null)
+        {
+            gamePlayPanel.SetActive(true);
+            CanvasGroup cg = gamePlayPanel.GetComponent<CanvasGroup>();
+            if (cg != null) cg.alpha = 1f;
+        }
+
+        // Healthbar and Oil lamp bar full restore & force visible
+        PlayerController pc = FindFirstObjectByType<PlayerController>();
+        if (pc != null)
+        {
+            targetHealth = pc.maxHealth;
+            if (healthSlider != null)
+            {
+                healthSlider.gameObject.SetActive(true);
+                healthSlider.maxValue = pc.maxHealth;
+                healthSlider.value = pc.maxHealth;
+            }
+
+            if (pc.hasTorch)
+            {
+                targetOil = pc.maxLampIntensity > 0 ? pc.maxLampIntensity : 100f;
+                if (oilLampSlider != null)
+                {
+                    oilLampSlider.gameObject.SetActive(true);
+                    oilLampSlider.maxValue = targetOil;
+                    oilLampSlider.value = targetOil;
+                }
+            }
+        }
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
+
+    private bool IsRPressedThisFrame()
+    {
+        if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame) return true;
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKeyDown(KeyCode.R)) return true;
+#endif
+        return false;
     }
 
     // ================= 6. Level Triggers & Notifications =================

@@ -113,7 +113,7 @@ public class DoubleDoorController : MonoBehaviour
             if (!isPlayerNear)
             {
                 isPlayerNear = true;
-                if (!isOpen && openDoorUI != null) openDoorUI.SetActive(true);
+                if (!isOpen && openDoorUI != null) AAAPressPromptAnimator.AnimatePrompt(openDoorUI, true);
             }
         }
         else
@@ -121,7 +121,7 @@ public class DoubleDoorController : MonoBehaviour
             if (isPlayerNear)
             {
                 isPlayerNear = false;
-                if (openDoorUI != null) openDoorUI.SetActive(false);
+                if (openDoorUI != null) AAAPressPromptAnimator.AnimatePrompt(openDoorUI, false);
             }
 
             // Close the door automatically when the player leaves the zone
@@ -168,7 +168,7 @@ public class DoubleDoorController : MonoBehaviour
                 {
                     Debug.LogError("[DoubleDoorController] DOOR OPEN SOUND MISSING! Please assign 'doorOpenSound' in the Inspector or add a clip to the AudioSource.");
                 }
-                if (openDoorUI != null) openDoorUI.SetActive(false);
+                if (openDoorUI != null) AAAPressPromptAnimator.AnimatePrompt(openDoorUI, false);
             }
         }
 
