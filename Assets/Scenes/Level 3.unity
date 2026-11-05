@@ -2801,6 +2801,7 @@ MonoBehaviour:
   minRenderScale: 0.65
   maxRenderScale: 1
   dynamicResolutionTargetFPS: 60
+  enableDynamicQuality: 1
   enableOcclusionCulling: 1
   prewarmObjectPools: 1
   poolPrewarmEntries: []
@@ -2938,6 +2939,37 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 6127477899084979101, guid: 29b9bc494775446a7857f1eefa91db7f, type: 3}
   m_PrefabInstance: {fileID: 878721263}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &890786312
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 890786313}
+  m_Layer: 0
+  m_Name: Spwan point  (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &890786313
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 890786312}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 1682, y: 90.43947, z: 2231}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &917334315
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5635,6 +5667,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7766759226065352745, guid: 748cbb3531d0342bfb52aa48808d5559, type: 3}
   m_PrefabInstance: {fileID: 1636489959}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1645734086
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1645734087}
+  m_Layer: 0
+  m_Name: 'Spwan point '
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1645734087
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1645734086}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 1806, y: 90.43947, z: 2640}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1668937985
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -7039,6 +7102,22 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1337590313}
     - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
+      propertyPath: spawnPoints.Array.size
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
+      propertyPath: 'spawnPoints.Array.data[0]'
+      value: 
+      objectReference: {fileID: 1645734087}
+    - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
+      propertyPath: 'spawnPoints.Array.data[1]'
+      value: 
+      objectReference: {fileID: 890786313}
+    - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
+      propertyPath: 'spawnPoints.Array.data[2]'
+      value: 
+      objectReference: {fileID: 2124631058}
+    - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
       propertyPath: 'prayTriggers.Array.data[2]'
       value: 
       objectReference: {fileID: 1406899497}
@@ -7665,6 +7744,37 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8483f02cbdd114e9aa6b0c438c1101bc, type: 3}
+--- !u!1 &2124631057
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2124631058}
+  m_Layer: 0
+  m_Name: Spwan point  (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2124631058
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2124631057}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 1234.1, y: 90.43947, z: 2302.9}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2126971922
 GameObject:
   m_ObjectHideFlags: 0
@@ -13412,6 +13522,9 @@ SceneRoots:
   - {fileID: 1796942526}
   - {fileID: 1098217725}
   - {fileID: 2115100954}
+  - {fileID: 1645734087}
+  - {fileID: 890786313}
+  - {fileID: 2124631058}
   - {fileID: 1558668449}
   - {fileID: 575203811}
   - {fileID: 967233747}

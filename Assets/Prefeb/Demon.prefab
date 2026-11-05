@@ -3344,7 +3344,7 @@ MonoBehaviour:
   player: {fileID: 0}
   triggerRadius: 50
   attackRange: 15
-  runSpeed: 15
+  runSpeed: 30
   attackCooldown: 1.5
   maxHealth: 1000
   healthBarSlider: {fileID: 7156900493368623000}

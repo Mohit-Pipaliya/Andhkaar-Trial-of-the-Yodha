@@ -422,9 +422,9 @@ public class UIManager : MonoBehaviour
 
     public void RestartGame()
     {
-        // Agar player mar chuka hai, toh naye rule ke mutabiq 10 meter door respawn karo
+        // Agar player mar chuka hai ya GameOver screen open hai, toh nearest spawn point par respawn karo taaki weapon/torch lost na ho
         PlayerController player = FindFirstObjectByType<PlayerController>();
-        if (player != null && player.currentHealth <= 0)
+        if (player != null && (player.currentHealth <= 0 || isGameOver))
         {
             player.RespawnNearDeathPoint();
             return;

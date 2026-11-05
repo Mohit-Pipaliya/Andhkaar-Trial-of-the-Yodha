@@ -52,6 +52,14 @@ namespace TMPro.Examples
 
         void Awake()
         {
+            // Guard: Never run on Main Camera or alongside game's CameraController
+            if (GetComponent<global::CameraController>() != null || gameObject.name == "Main Camera")
+            {
+                enabled = false;
+                Destroy(this);
+                return;
+            }
+
             if (QualitySettings.vSyncCount > 0)
                 Application.targetFrameRate = 60;
             else

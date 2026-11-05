@@ -974,6 +974,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0.7, z: 0}
+--- !u!1 &285976607
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 285976608}
+  m_Layer: 0
+  m_Name: Spwan point  (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &285976608
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 285976607}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: 0.0061086393, z: -0, w: 0.99998134}
+  m_LocalPosition: {x: 619, y: 114.7, z: 1696}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &286830980
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2196,6 +2227,37 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 7ef027989b7c946f396b90284dd987db, type: 3}
+--- !u!1 &495580167
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 495580168}
+  m_Layer: 0
+  m_Name: Spwan point  (3)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &495580168
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 495580167}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: 0.0061086393, z: -0, w: 0.99998134}
+  m_LocalPosition: {x: 316.9, y: 114.7, z: 1747.8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &511289732
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2336,6 +2398,37 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 7710875211865681909, guid: 29b9bc494775446a7857f1eefa91db7f, type: 3}
   m_PrefabInstance: {fileID: 1145239205}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &524697011
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 524697012}
+  m_Layer: 0
+  m_Name: Spwan point  (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &524697012
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 524697011}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: 0.0061086393, z: -0, w: 0.99998134}
+  m_LocalPosition: {x: 1066, y: 114.7, z: 2279}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &526973002
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2776,6 +2869,26 @@ PrefabInstance:
       propertyPath: 'gates.Array.data[1]'
       value: 
       objectReference: {fileID: 1292494521}
+    - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
+      propertyPath: spawnPoints.Array.size
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
+      propertyPath: 'spawnPoints.Array.data[0]'
+      value: 
+      objectReference: {fileID: 1637004390}
+    - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
+      propertyPath: 'spawnPoints.Array.data[1]'
+      value: 
+      objectReference: {fileID: 524697012}
+    - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
+      propertyPath: 'spawnPoints.Array.data[2]'
+      value: 
+      objectReference: {fileID: 285976608}
+    - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
+      propertyPath: 'spawnPoints.Array.data[3]'
+      value: 
+      objectReference: {fileID: 495580168}
     - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
       propertyPath: 'prayTriggers.Array.data[1]'
       value: 
@@ -7596,6 +7709,37 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 7ef027989b7c946f396b90284dd987db, type: 3}
+--- !u!1 &1637004389
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1637004390}
+  m_Layer: 0
+  m_Name: 'Spwan point '
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1637004390
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1637004389}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: 0.0061086393, z: -0, w: 0.99998134}
+  m_LocalPosition: {x: 361, y: 124.18432, z: 2288}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1637946689
 GameObject:
   m_ObjectHideFlags: 0
@@ -9493,6 +9637,7 @@ MonoBehaviour:
   minRenderScale: 0.65
   maxRenderScale: 1
   dynamicResolutionTargetFPS: 60
+  enableDynamicQuality: 1
   enableOcclusionCulling: 1
   prewarmObjectPools: 1
   poolPrewarmEntries: []
@@ -16191,6 +16336,10 @@ SceneRoots:
   - {fileID: 1456974297}
   - {fileID: 1894635238}
   - {fileID: 1842227445}
+  - {fileID: 1637004390}
+  - {fileID: 524697012}
+  - {fileID: 285976608}
+  - {fileID: 495580168}
   - {fileID: 40989136}
   - {fileID: 196060284}
   - {fileID: 285771830}

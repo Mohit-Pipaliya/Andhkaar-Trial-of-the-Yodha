@@ -207,12 +207,21 @@ public class PlayerController : MonoBehaviour
     public static event Action OnPlayerDied;
     public static event Action OnPlayerRespawned; // R dabane par player respawn hone ka event
 
-    [Header("Respawn Settings")]
-    [Tooltip("Player marne par kitne meter door spawn hoga")]
+    [Header("Respawn & Checkpoint Settings")]
+    [Tooltip("Scene ke banaye huye Spawn Points (Transforms) yahan drag karein.")]
+    public Transform[] spawnPoints;
+
+    [Tooltip("Spawn point ke kitne paas aane par use 'Crossed / Reached' mana jaye (meters)")]
+    public float checkpointDetectionRadius = 6f;
+
+    [Tooltip("Agar koi spawn point set na ho toh marne par kitne meter door fallback spawn hoga")]
     public float respawnDistance = 4.5f;
+
     private Vector3 deathPosition = Vector3.zero;
     private Coroutine deathCoroutine;
     private Coroutine revivalRoutine;
+    // Track jo spawn points player ab tak cross kar chuka hai
+    private readonly System.Collections.Generic.HashSet<Transform> crossedSpawnPoints = new System.Collections.Generic.HashSet<Transform>();
     // Breadcrumb trail: Player jaha se guzar chuka hai un jagaho ka track
     private readonly System.Collections.Generic.List<Vector3> traversedPathHistory = new System.Collections.Generic.List<Vector3>(600);
 
@@ -467,6 +476,7 @@ public class PlayerController : MonoBehaviour
             GameSaveManager.ClearSave();
         }
         GameSaveManager.LoadGameState(this);
+        InitializeSpawnPoints();
         if (animator != null)
             animator.applyRootMotion = false;
 
@@ -686,6 +696,12 @@ public class PlayerController : MonoBehaviour
                     traversedPathHistory.RemoveAt(0);
                 }
             }
+        }
+
+        // ─── CHECKPOINT / SPAWN POINT CROSS TRACKING ─────────
+        if (currentHealth > 0)
+        {
+            UpdateCrossedSpawnPoints();
         }
 
         // ─── IDLE CHECK & HEALTH REGENERATION ───────────────────
@@ -1476,7 +1492,7 @@ public class PlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// Player marne par jaha se guzar chuka hai wahi 10 meter peeche coolest revival animation ke sath respawn karta hai.
+    /// Player marne par sabse paas wale crossed spawn point par respawn karta hai (aur torch / weapons ko retain rakhta hai).
     /// </summary>
     public void RespawnNearDeathPoint()
     {
@@ -1487,20 +1503,41 @@ public class PlayerController : MonoBehaviour
         }
 
         Vector3 baseDeathPoint = deathPosition != Vector3.zero ? deathPosition : transform.position;
-        // Jaha se player guzar chuka hai, waha 10 meter peeche ka safe ground point dhoondhna
-        Vector3 spawnPos = FindTraversedRespawnPosition(baseDeathPoint, respawnDistance);
 
-        // 1. CharacterController disable karke firm ground position update karo
+        // 1. Choose spawn point: Jo spawn point cross kiya hai aur marne ki jagah ke sabse paas hai
+        Transform targetSpawn = GetNearestCrossedSpawnPoint(baseDeathPoint);
+        Vector3 spawnPos;
+        Quaternion spawnRot = transform.rotation;
+
+        if (targetSpawn != null)
+        {
+            spawnPos = targetSpawn.position;
+            spawnRot = targetSpawn.rotation;
+        }
+        else
+        {
+            // Fallback: Agar inspector me koi spawn point na dala ho toh safe ground calculation use karo
+            spawnPos = FindTraversedRespawnPosition(baseDeathPoint, respawnDistance);
+            Vector3 lookDir = (baseDeathPoint - spawnPos);
+            lookDir.y = 0f;
+            if (lookDir.sqrMagnitude > 0.01f)
+            {
+                spawnRot = Quaternion.LookRotation(lookDir);
+            }
+        }
+
+        // Snap safely to ground so player doesn't hover or fall through
+        int groundMask = ~LayerMask.GetMask("Player", "Ignore Raycast");
+        RaycastHit groundHit;
+        if (Physics.Raycast(spawnPos + Vector3.up * 1.5f, Vector3.down, out groundHit, 4.0f, groundMask, QueryTriggerInteraction.Ignore))
+        {
+            spawnPos.y = groundHit.point.y;
+        }
+
+        // 2. CharacterController disable karke firm ground position & rotation update karo
         if (controller != null) controller.enabled = false;
         transform.position = spawnPos;
-
-        // Death point ki taraf dekhna taaki orientation perfect rahe
-        Vector3 lookDir = (baseDeathPoint - spawnPos);
-        lookDir.y = 0f;
-        if (lookDir.sqrMagnitude > 0.01f)
-        {
-            transform.rotation = Quaternion.LookRotation(lookDir);
-        }
+        transform.rotation = spawnRot;
 
         if (controller != null)
         {
@@ -1509,22 +1546,23 @@ public class PlayerController : MonoBehaviour
             controller.Move(Vector3.down * 0.35f);
         }
 
-        // 2. Physics & Velocities reset
+        // 3. Physics & Velocities reset
         verticalVelocity = -groundSnapForce; // Firmly stick to ground on frame 1
         horizontalVelocity = Vector3.zero;
 
-        // 3. Health restore
+        // 4. Health restore
         currentHealth = maxHealth;
+        deathPosition = Vector3.zero;
         OnHealthChanged?.Invoke(currentHealth);
 
-        // 4. Action and combat states reset
+        // 5. Action and combat states reset
         isAttacking = false;
         isSpecialActionPlaying = false;
         isSliding = false;
         activeCombatEngagements = 0;
         SetLampFreeze(false);
 
-        // Torch visual & oil restore
+        // 6. WEAPON & TORCH PRESERVATION (Player ka collected weapon aur torch retain rahega)
         if (hasTorch)
         {
             if (handLampObject != null) handLampObject.SetActive(true);
@@ -1540,25 +1578,136 @@ public class PlayerController : MonoBehaviour
             lampDrainCoroutine = StartCoroutine(DrainLampOil());
         }
 
-        // Weapon visual restore
+        // Agar player ne koi sword pick ki thi toh usko hath me equip rakho
+        if (currentWeapon == WeaponType.None)
+        {
+            if (hasSword2) currentWeapon = WeaponType.Sword2;
+            else if (hasSword1) currentWeapon = WeaponType.Sword1;
+        }
         UpdateWeaponState(currentWeapon);
 
-        // 5. Camera Snap to new position
+        // 7. Camera Snap to new position
         CameraController cam = FindFirstObjectByType<CameraController>();
         if (cam != null)
         {
             cam.SnapToTarget();
         }
 
-        // 6. COOLEST AAA REVIVAL ANIMATION & VFX SEQUENCE
+        // 8. COOLEST AAA REVIVAL ANIMATION & VFX SEQUENCE
         RevivalVFX.Play(transform, spawnPos);
         if (revivalRoutine != null) StopCoroutine(revivalRoutine);
         revivalRoutine = StartCoroutine(RevivalSequenceRoutine());
 
-        // 7. Fire respawn event
+        // 9. Fire respawn event
         OnPlayerRespawned?.Invoke();
 
-        Debug.Log($"[Respawn] Player successfully respawned along traversed path at {spawnPos}, {Vector3.Distance(baseDeathPoint, spawnPos):F1}m back from death location.");
+        Debug.Log($"[Respawn] Player successfully respawned at {(targetSpawn != null ? targetSpawn.name : "safe fallback")} ({spawnPos}).");
+    }
+
+    /// <summary>
+    /// Start me scene me lagaye gaye spawn points ko initialize karta hai
+    /// </summary>
+    private void InitializeSpawnPoints()
+    {
+        crossedSpawnPoints.Clear();
+
+        if (spawnPoints != null && spawnPoints.Length > 0)
+        {
+            // Shuru me player ke sabse paas wale spawn point ko crossed mark karo
+            Transform initialSpawn = null;
+            float minDist = float.MaxValue;
+            for (int i = 0; i < spawnPoints.Length; i++)
+            {
+                if (spawnPoints[i] != null)
+                {
+                    float dist = Vector3.Distance(transform.position, spawnPoints[i].position);
+                    if (dist < minDist)
+                    {
+                        minDist = dist;
+                        initialSpawn = spawnPoints[i];
+                    }
+                }
+            }
+
+            if (initialSpawn != null)
+            {
+                crossedSpawnPoints.Add(initialSpawn);
+            }
+            else if (spawnPoints[0] != null)
+            {
+                crossedSpawnPoints.Add(spawnPoints[0]);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gameplay ke dauran check karta hai ki player ne kaun-kaun se spawn points cross kar liye hain
+    /// </summary>
+    private void UpdateCrossedSpawnPoints()
+    {
+        if (spawnPoints == null || spawnPoints.Length == 0) return;
+
+        for (int i = 0; i < spawnPoints.Length; i++)
+        {
+            Transform sp = spawnPoints[i];
+            if (sp != null && !crossedSpawnPoints.Contains(sp))
+            {
+                float dist = Vector3.Distance(transform.position, sp.position);
+                if (dist <= checkpointDetectionRadius)
+                {
+                    crossedSpawnPoints.Add(sp);
+                    Debug.Log($"[Checkpoint] Player crossed spawn point: {sp.name}");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Player ke marne ki position ke sabse kareeb jo spawn point hai (aur jo player ne cross kiya hai), use dhoondhta hai.
+    /// </summary>
+    public Transform GetNearestCrossedSpawnPoint(Vector3 deathPos)
+    {
+        if (spawnPoints == null || spawnPoints.Length == 0) return null;
+
+        Transform bestSpawn = null;
+        float minDistance = float.MaxValue;
+
+        // 1. Pehle sirf un spawn points me dhoondho jo player cross kar chuka hai
+        if (crossedSpawnPoints != null && crossedSpawnPoints.Count > 0)
+        {
+            foreach (Transform sp in crossedSpawnPoints)
+            {
+                if (sp != null)
+                {
+                    float dist = Vector3.Distance(deathPos, sp.position);
+                    if (dist < minDistance)
+                    {
+                        minDistance = dist;
+                        bestSpawn = sp;
+                    }
+                }
+            }
+        }
+
+        // 2. Agar koi crossed spawn point nahi mila toh saare assigned spawn points me se sabse paas wala lo
+        if (bestSpawn == null)
+        {
+            minDistance = float.MaxValue;
+            for (int i = 0; i < spawnPoints.Length; i++)
+            {
+                if (spawnPoints[i] != null)
+                {
+                    float dist = Vector3.Distance(deathPos, spawnPoints[i].position);
+                    if (dist < minDistance)
+                    {
+                        minDistance = dist;
+                        bestSpawn = spawnPoints[i];
+                    }
+                }
+            }
+        }
+
+        return bestSpawn;
     }
 
     private System.Collections.IEnumerator RevivalSequenceRoutine()
@@ -2204,6 +2353,21 @@ public class PlayerController : MonoBehaviour
     // ═══════════════════════════════════════════════════════════
     private void OnTriggerEnter(Collider other)
     {
+        // Check if player entered a spawn point trigger
+        if (spawnPoints != null)
+        {
+            for (int i = 0; i < spawnPoints.Length; i++)
+            {
+                if (spawnPoints[i] != null && (other.transform == spawnPoints[i] || other.transform.IsChildOf(spawnPoints[i])))
+                {
+                    if (crossedSpawnPoints.Add(spawnPoints[i]))
+                    {
+                        Debug.Log($"[Checkpoint] Trigger entered spawn point: {spawnPoints[i].name}");
+                    }
+                }
+            }
+        }
+
         for (int i = 0; i < prayTriggers.Length; i++)
         {
             if (prayTriggers[i] != null && other.transform == prayTriggers[i])
@@ -2368,6 +2532,21 @@ public class PlayerController : MonoBehaviour
         Gizmos.DrawSphere(transform.position, pickupRange);
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, pickupRange);
+
+        // ─ Spawn Points visualization ─
+        if (spawnPoints != null)
+        {
+            for (int i = 0; i < spawnPoints.Length; i++)
+            {
+                if (spawnPoints[i] != null)
+                {
+                    bool isCrossed = crossedSpawnPoints != null && crossedSpawnPoints.Contains(spawnPoints[i]);
+                    Gizmos.color = isCrossed ? Color.green : new Color(0f, 0.8f, 1f, 0.7f);
+                    Gizmos.DrawWireSphere(spawnPoints[i].position, 0.6f);
+                    Gizmos.DrawRay(spawnPoints[i].position, spawnPoints[i].forward * 1.5f);
+                }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
