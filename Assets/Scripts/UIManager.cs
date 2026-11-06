@@ -53,17 +53,55 @@ public class UIManager : MonoBehaviour
     private float targetHealth = 100f;
     private float targetOil = 100f;
 
-    // ================= EVENT SUBSCRIPTION =================
+    // ================= SINGLETON & PERSISTENCE =================
+    public static UIManager Instance { get; private set; }
+
     private void Awake()
     {
-        // Auto-fix EventSystem code removed because adding InputSystemUIInputModule 
-        // at runtime without an actions asset breaks UI buttons.
-        // User must click "Replace with InputSystemUIInputModule" on the EventSystem in the Unity Editor.
+        if (Instance != null && Instance != this)
+        {
+            Destroy(transform.root.gameObject);
+            return;
+        }
+
+        Instance = this;
+        DontDestroyOnLoad(transform.root.gameObject);
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+        }
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        // 1 frame delay taaki naye scene ka PlayerController.Start() pehle save load kar le
+        StartCoroutine(DelayedSetupSceneUI(scene.name));
+    }
+
+    private IEnumerator DelayedSetupSceneUI(string sceneName)
+    {
+        yield return null;
+        SetupSceneUI(sceneName);
     }
 
     private void OnEnable()
     {
-        // Subscribe to PlayerController events (Event-Driven Architecture)
+        ResubscribePlayerEvents();
+    }
+
+    private void OnDisable()
+    {
+        UnsubscribePlayerEvents();
+    }
+
+    private void ResubscribePlayerEvents()
+    {
+        UnsubscribePlayerEvents();
         PlayerController.OnHealthChanged += UpdateHealthSmooth;
         PlayerController.OnOilChanged += UpdateOilSmooth;
         PlayerController.OnTorchStateChanged += ToggleOilSlider;
@@ -71,9 +109,8 @@ public class UIManager : MonoBehaviour
         PlayerController.OnPlayerRespawned += HandlePlayerRespawn;
     }
 
-    private void OnDisable()
+    private void UnsubscribePlayerEvents()
     {
-        // Unsubscribe to prevent memory leaks
         PlayerController.OnHealthChanged -= UpdateHealthSmooth;
         PlayerController.OnOilChanged -= UpdateOilSmooth;
         PlayerController.OnTorchStateChanged -= ToggleOilSlider;
@@ -83,9 +120,16 @@ public class UIManager : MonoBehaviour
 
     private void Start()
     {
-        // Force hide all panels first instantly
+        SetupSceneUI(SceneManager.GetActiveScene().name);
+    }
+
+    public void SetupSceneUI(string currentSceneName)
+    {
+        if (string.IsNullOrEmpty(currentSceneName))
+            currentSceneName = SceneManager.GetActiveScene().name;
+
+        // Force hide other panels first
         HidePanel(mainMenuPanel, false);
-        HidePanel(gamePlayPanel, false);
         HidePanel(pauseMenuPanel, false);
         HidePanel(optionsMenuPanel, false);
         HidePanel(notificationPanel, false);
@@ -94,28 +138,51 @@ public class UIManager : MonoBehaviour
         HidePanel(gameOverPanel, false);
         HidePanel(loadingPanel, false);
 
-        // Sliders setup
+        // Sliders & Player setup
         PlayerController pc = FindFirstObjectByType<PlayerController>();
-        float pMaxHealth = (pc != null) ? pc.maxHealth : 1000f; // Default to 1000 fallback
+        float pMaxHealth = (pc != null) ? pc.maxHealth : 1000f;
+        float pCurrentHealth = (pc != null && pc.currentHealth > 0) ? pc.currentHealth : pMaxHealth;
 
-        healthSlider.maxValue = pMaxHealth;
-        healthSlider.value = pMaxHealth;
-        targetHealth = pMaxHealth;
+        if (healthSlider != null)
+        {
+            healthSlider.maxValue = pMaxHealth;
+            healthSlider.value = pCurrentHealth;
+            targetHealth = pCurrentHealth;
+        }
 
-        oilLampSlider.maxValue = 100f;
-        oilLampSlider.value = 100f;
-        targetOil = 100f;
-        oilLampSlider.gameObject.SetActive(false); // Start me hide rakho
+        bool playerHasTorch = (pc != null && pc.hasTorch);
+        if (oilLampSlider != null)
+        {
+            oilLampSlider.maxValue = 100f;
+            oilLampSlider.gameObject.SetActive(playerHasTorch);
+            if (playerHasTorch && pc != null && pc.handLampLight != null)
+            {
+                targetOil = pc.handLampLight.intensity;
+                oilLampSlider.value = targetOil;
+            }
+            else
+            {
+                targetOil = 100f;
+                oilLampSlider.value = 100f;
+            }
+        }
 
-        levelText.text = "Level : 1";
+        if (levelText != null)
+        {
+            if (currentSceneName == "Level 2") levelText.text = "Level : 2";
+            else if (currentSceneName == "Level 3") levelText.text = "Level : 3";
+            else levelText.text = "Level : 1";
+        }
 
         if (volumeSlider != null)
         {
+            volumeSlider.onValueChanged.RemoveListener(SetVolume);
             volumeSlider.onValueChanged.AddListener(SetVolume);
             volumeSlider.value = AudioListener.volume;
         }
 
-        string currentSceneName = SceneManager.GetActiveScene().name;
+        // Re-subscribe events to current PlayerController
+        ResubscribePlayerEvents();
 
         if (currentSceneName == "Level 1" && !hasStartedOnce)
         {
@@ -128,8 +195,14 @@ public class UIManager : MonoBehaviour
         {
             // Skip loading and main menu, go straight to gameplay
             ShowPanel(gamePlayPanel, false);
+            if (gamePlayPanel != null)
+            {
+                CanvasGroup cg = gamePlayPanel.GetComponent<CanvasGroup>();
+                if (cg != null) cg.alpha = 1f;
+            }
             Time.timeScale = 1f; 
             isGamePaused = false;
+            isGameOver = false;
             isGameActive = true; // Unlock player input
             
             Cursor.lockState = CursorLockMode.Locked;

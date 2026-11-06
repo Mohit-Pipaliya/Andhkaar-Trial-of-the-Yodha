@@ -219,15 +219,28 @@ public class AdvancedSceneTeleport : MonoBehaviour
         if (glowLight != null) Destroy(glowLight.gameObject);
         if (portalRing != null) Destroy(portalRing.gameObject);
 
-        // Tell the destination scene to skip main menu and go straight to gameplay
+        // Tell the destination scene to skip main menu and mark as cross-scene teleportation
         PlayerPrefs.SetInt("SkipMenuOnRetry", 1);
+        PlayerPrefs.SetInt("IsCrossSceneTeleport", 1);
         PlayerPrefs.Save();
 
         // Save Player's current health, weapons, and torch state before leaving this scene
-        PlayerController pc = player.GetComponent<PlayerController>();
+        PlayerController pc = null;
+        if (player != null)
+        {
+            pc = player.GetComponent<PlayerController>() 
+                 ?? player.GetComponentInParent<PlayerController>() 
+                 ?? player.GetComponentInChildren<PlayerController>();
+        }
+        if (pc == null)
+        {
+            pc = FindFirstObjectByType<PlayerController>();
+        }
+
         if (pc != null)
         {
             GameSaveManager.SaveGameState(pc);
+            Debug.Log($"[AdvancedSceneTeleport] Saved player state before loading {targetSceneName}: Torch={pc.hasTorch}, Sword1={pc.hasSword1}, Sword2={pc.hasSword2}, Weapon={pc.currentWeapon}");
         }
 
         // Load the Next Scene

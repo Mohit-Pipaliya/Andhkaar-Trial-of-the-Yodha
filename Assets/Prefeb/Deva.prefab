@@ -610,7 +610,7 @@ MonoBehaviour:
   oilCanePrefab: {fileID: 2476785098520675071, guid: d1d725287eabd4f41a7ba837b27c5805, type: 3}
   oilCaneSpawnDistance: 20
   handLampLight: {fileID: 4267014662595684135}
-  lampDrainRate: 10
+  lampDrainRate: 3
   maxLampIntensity: 100
   handBone: {fileID: 6140612550056945079}
   otherHandBone: {fileID: 9092464103569520338}

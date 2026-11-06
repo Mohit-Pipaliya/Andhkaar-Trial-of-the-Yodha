@@ -12,13 +12,26 @@ public class GameSaveManager : MonoBehaviour
         PlayerPrefs.SetInt("HasSword1", player.hasSword1 ? 1 : 0);
         PlayerPrefs.SetInt("HasSword2", player.hasSword2 ? 1 : 0);
         PlayerPrefs.SetInt("HasTorch", player.hasTorch ? 1 : 0);
-        PlayerPrefs.SetInt("CurrentWeapon", (int)player.currentWeapon);
 
-        // Optional: Save current scene index
+        // Ensure weapon isn't saved as None if player has collected a sword
+        int weaponEnumVal = (int)player.currentWeapon;
+        if (weaponEnumVal == 0)
+        {
+            if (player.hasSword2) weaponEnumVal = (int)PlayerController.WeaponType.Sword2;
+            else if (player.hasSword1) weaponEnumVal = (int)PlayerController.WeaponType.Sword1;
+        }
+        PlayerPrefs.SetInt("CurrentWeapon", weaponEnumVal);
+
+        if (player.handLampLight != null)
+        {
+            PlayerPrefs.SetFloat("LampIntensity", player.handLampLight.intensity);
+        }
+
+        // Save current scene index
         PlayerPrefs.SetInt("SavedSceneIndex", SceneManager.GetActiveScene().buildIndex);
 
         PlayerPrefs.Save();
-        Debug.Log("Game Saved Successfully!");
+        Debug.Log($"[GameSaveManager] Saved state: Torch={player.hasTorch}, Sword1={player.hasSword1}, Sword2={player.hasSword2}, Weapon={weaponEnumVal}, Health={player.currentHealth}");
     }
 
     // Loads the player's state from PlayerPrefs
@@ -26,19 +39,39 @@ public class GameSaveManager : MonoBehaviour
     {
         if (player == null) return;
 
-        // Check if a save exists (by checking health)
-        if (PlayerPrefs.HasKey("PlayerHealth"))
+        // Check if any saved equipment or player state exists
+        if (PlayerPrefs.HasKey("HasTorch") || PlayerPrefs.HasKey("HasSword1") || PlayerPrefs.HasKey("HasSword2") || PlayerPrefs.HasKey("CurrentWeapon") || PlayerPrefs.HasKey("PlayerHealth"))
         {
-            player.currentHealth = PlayerPrefs.GetFloat("PlayerHealth");
+            if (PlayerPrefs.HasKey("PlayerHealth"))
+            {
+                float savedHealth = PlayerPrefs.GetFloat("PlayerHealth");
+                player.currentHealth = savedHealth > 0 ? savedHealth : player.maxHealth;
+            }
             
             player.hasSword1 = PlayerPrefs.GetInt("HasSword1", 0) == 1;
             player.hasSword2 = PlayerPrefs.GetInt("HasSword2", 0) == 1;
-            player.hasTorch = PlayerPrefs.GetInt("HasTorch", 0) == 1;
+            player.hasTorch  = PlayerPrefs.GetInt("HasTorch", 0) == 1;
 
             int weaponEnumVal = PlayerPrefs.GetInt("CurrentWeapon", 0);
-            player.UpdateWeaponState((PlayerController.WeaponType)weaponEnumVal);
+            if (!player.hasSword1 && !player.hasSword2)
+            {
+                weaponEnumVal = 0;
+            }
+            else if (weaponEnumVal == 0)
+            {
+                if (player.hasSword2) weaponEnumVal = (int)PlayerController.WeaponType.Sword2;
+                else if (player.hasSword1) weaponEnumVal = (int)PlayerController.WeaponType.Sword1;
+            }
+            player.currentWeapon = (PlayerController.WeaponType)weaponEnumVal;
+            player.UpdateWeaponState(player.currentWeapon);
 
-            Debug.Log("Game Loaded Successfully!");
+            if (player.hasTorch && player.handLampLight != null && PlayerPrefs.HasKey("LampIntensity"))
+            {
+                float savedIntensity = PlayerPrefs.GetFloat("LampIntensity");
+                player.handLampLight.intensity = savedIntensity > 0 ? savedIntensity : player.maxLampIntensity;
+            }
+
+            Debug.Log($"[GameSaveManager] Loaded state: Torch={player.hasTorch}, Sword1={player.hasSword1}, Sword2={player.hasSword2}, Weapon={player.currentWeapon}");
         }
 
         // --- SPAWN POINT LOGIC (Cross-Scene Door Transitions) ---
@@ -54,7 +87,6 @@ public class GameSaveManager : MonoBehaviour
                 if (cc != null) cc.enabled = false; // Unity requirement for teleporting CC
                 
                 player.transform.position = doorObj.transform.position;
-                // player.transform.rotation = doorObj.transform.rotation; // Uncomment if you want them facing the same way
                 
                 if (cc != null) cc.enabled = true;
                 
@@ -79,7 +111,10 @@ public class GameSaveManager : MonoBehaviour
         PlayerPrefs.DeleteKey("HasSword2");
         PlayerPrefs.DeleteKey("HasTorch");
         PlayerPrefs.DeleteKey("CurrentWeapon");
+        PlayerPrefs.DeleteKey("LampIntensity");
         PlayerPrefs.DeleteKey("SavedSceneIndex");
+        PlayerPrefs.DeleteKey("IsCrossSceneTeleport");
+        PlayerPrefs.DeleteKey("SkipMenuOnRetry");
         PlayerPrefs.Save();
         Debug.Log("Game Save Cleared!");
     }

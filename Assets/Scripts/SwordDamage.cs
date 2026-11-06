@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class SwordDamage : MonoBehaviour
 {
+    public static float LastSwordDamageTime = -999f;
     public int damageAmount = 100;
     
     private PlayerController player;
@@ -49,6 +50,7 @@ public class SwordDamage : MonoBehaviour
             HitVFX.CreateSwordClashSparks(hitPoint, clashNormal);
             Debug.Log("<color=cyan>Sword Collider ne Enemy ko " + damageAmount + " damage diya!</color>");
             lastHitTime = Time.time;
+            LastSwordDamageTime = Time.time;
         }
         else
         {
@@ -62,6 +64,7 @@ public class SwordDamage : MonoBehaviour
                 HitVFX.CreateSwordClashSparks(hitPoint, clashNormal);
                 Debug.Log("<color=cyan>Sword Collider ne Stationary Enemy ko " + damageAmount + " damage diya!</color>");
                 lastHitTime = Time.time;
+                LastSwordDamageTime = Time.time;
             }
             else
             {
@@ -74,6 +77,7 @@ public class SwordDamage : MonoBehaviour
                     HitVFX.CreateSwordClashSparks(hitPoint, clashNormal);
                     Debug.Log("<color=cyan>Sword Collider ne Boss ko 300 damage diya!</color>");
                     lastHitTime = Time.time;
+                    LastSwordDamageTime = Time.time;
                 }
             }
         }

@@ -1850,6 +1850,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3f065472a588245a9b143a00f5b94e03, type: 3}
+--- !u!1 &504685505 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5419319913499744686, guid: 3f065472a588245a9b143a00f5b94e03, type: 3}
+  m_PrefabInstance: {fileID: 504685504}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &553085558
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2435,7 +2440,7 @@ GameObject:
   - component: {fileID: 755612183}
   - component: {fileID: 755612186}
   - component: {fileID: 755612185}
-  - component: {fileID: 755612184}
+  - component: {fileID: 755612187}
   m_Layer: 0
   m_Name: BattleGround
   m_TagString: Untagged
@@ -2458,29 +2463,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1472493428}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!136 &755612184
-CapsuleCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 755612182}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Radius: 0.5000001
-  m_Height: 2
-  m_Direction: 1
-  m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!23 &755612185
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2538,6 +2520,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 755612182}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &755612187
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 755612182}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 2, z: 1.0000001}
+  m_Center: {x: 0.00000005960464, y: -0.000000007450581, z: -0.00000008940696}
 --- !u!1001 &770563366
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4489,11 +4492,6 @@ PrefabInstance:
 Transform:
   m_CorrespondingSourceObject: {fileID: 2856974742914827361, guid: 8483f02cbdd114e9aa6b0c438c1101bc, type: 3}
   m_PrefabInstance: {fileID: 1337553484}
-  m_PrefabAsset: {fileID: 0}
---- !u!1 &1337590313 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 3686629968743052344, guid: 3f065472a588245a9b143a00f5b94e03, type: 3}
-  m_PrefabInstance: {fileID: 504685504}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &1362126459
 GameObject:
@@ -7100,7 +7098,7 @@ PrefabInstance:
     - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
       propertyPath: 'gates.Array.data[2]'
       value: 
-      objectReference: {fileID: 1337590313}
+      objectReference: {fileID: 504685505}
     - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
       propertyPath: spawnPoints.Array.size
       value: 3
@@ -7128,7 +7126,7 @@ PrefabInstance:
     - target: {fileID: 3614271160992792849, guid: 3be33ef40f7114226af18407df50d3e7, type: 3}
       propertyPath: 'specialObjects.Array.data[2]'
       value: 
-      objectReference: {fileID: 2158892920046052789}
+      objectReference: {fileID: 4669859315471965006}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

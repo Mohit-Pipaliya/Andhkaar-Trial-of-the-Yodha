@@ -400,6 +400,12 @@ public class PlayerController : MonoBehaviour
 
     void OnDisable()
     {
+        // Scene change ya script disable hone par equipment save karo taaki agle scene me retain rahe
+        if (currentHealth > 0)
+        {
+            GameSaveManager.SaveGameState(this);
+        }
+
         moveAction.Disable(); runAction.Disable(); jumpAction.Disable();
         slideAction.Disable(); lookAction.Disable(); attackAction.Disable();
         interactWeaponAction.Disable(); interactLampAction.Disable(); dropWeaponAction.Disable(); dropLampAction.Disable();
@@ -470,12 +476,59 @@ public class PlayerController : MonoBehaviour
 
         currentHealth = maxHealth; // Setup health default
         
-        // --- NEW: Load Game State across levels ---
-        if (resetSaveOnPlay)
+        // --- Cross-Scene Teleport & Fresh Start Logic ---
+        string activeSceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        bool isCrossSceneTeleport = PlayerPrefs.GetInt("IsCrossSceneTeleport", 0) == 1;
+        // Consume the transition flags immediately so normal reloads/restarts aren't stuck in teleport mode
+        PlayerPrefs.SetInt("IsCrossSceneTeleport", 0);
+        PlayerPrefs.SetInt("SkipMenuOnRetry", 0);
+        PlayerPrefs.Save();
+
+        // Level 1 fresh start (unless teleported into Level 1 from another level)
+        if (activeSceneName == "Level 1" && !isCrossSceneTeleport)
         {
             GameSaveManager.ClearSave();
+            hasTorch = false;
+            hasSword1 = false;
+            hasSword2 = false;
+            currentWeapon = WeaponType.None;
         }
-        GameSaveManager.LoadGameState(this);
+
+        // Auto-find missing weapon/torch objects if unassigned
+        if (handLampObject == null || handLampLight == null || handSword1Object == null || handSword2Object == null)
+        {
+            Transform[] allChildren = GetComponentsInChildren<Transform>(true);
+            foreach (var t in allChildren)
+            {
+                string lowerName = t.name.ToLower();
+                if (handLampObject == null && (lowerName.Contains("lamp") || lowerName.Contains("torch")))
+                {
+                    handLampObject = t.gameObject;
+                    if (handLampLight == null) handLampLight = t.GetComponentInChildren<Light>();
+                }
+                if (handSword1Object == null && (lowerName.Contains("sword 1") || lowerName.Contains("sword1")))
+                    handSword1Object = t.gameObject;
+                if (handSword2Object == null && (lowerName.Contains("sword 2") || lowerName.Contains("sword2")))
+                    handSword2Object = t.gameObject;
+            }
+        }
+
+        // Ensure both hand swords have trigger colliders & SwordDamage components
+        EnsureSwordComponents(handSword1Object);
+        EnsureSwordComponents(handSword2Object);
+
+        // In Scene 2 / Scene 3 (or if teleported), load previously saved inventory
+        if (activeSceneName != "Level 1" || isCrossSceneTeleport)
+        {
+            GameSaveManager.LoadGameState(this);
+        }
+
+        // Harmonize lamp drain rate across all levels so it never drains faster than Scene 1
+        if (lampDrainRate > 3f)
+        {
+            lampDrainRate = 3f;
+        }
+
         InitializeSpawnPoints();
         if (animator != null)
             animator.applyRootMotion = false;
@@ -487,7 +540,6 @@ public class PlayerController : MonoBehaviour
         originalCenter = controller.center;
 
         // ── Hand Lamp visual sync ──────────────────────
-        // Load Game State ke baad agar torch hai toh usko dikhao, warna hide karo
         if (handLampObject != null)
             handLampObject.SetActive(hasTorch);
 
@@ -496,14 +548,45 @@ public class PlayerController : MonoBehaviour
             handLampLight.enabled = hasTorch;
             if (hasTorch)
             {
-                handLampLight.intensity = maxLampIntensity; // Ya saved intensity agar aage implement karo
+                if (lampDrainCoroutine != null) StopCoroutine(lampDrainCoroutine);
                 lampDrainCoroutine = StartCoroutine(DrainLampOil());
             }
         }
 
+        // Notify UI & Animator immediately about Torch state & Health
+        OnHealthChanged?.Invoke(currentHealth);
+        if (hasTorch)
+        {
+            OnTorchStateChanged?.Invoke(true);
+            if (handLampLight != null)
+            {
+                OnOilChanged?.Invoke(handLampLight.intensity);
+            }
+            if (animator != null)
+            {
+                animator.SetBool("HasTorch", activeCombatEngagements == 0);
+            }
+        }
+        else
+        {
+            OnTorchStateChanged?.Invoke(false);
+            if (animator != null)
+            {
+                animator.SetBool("HasTorch", false);
+            }
+        }
+
         // ── Hand Sword visual sync ──────────────────────
-        // LoadGameState ne pehle hi currentWeapon set kar diya hai.
-        // Hum bas dobara UpdateWeaponState call kar dete hain taaki visual sync ho jaye.
+        // Player starts with empty hands if neither sword was collected
+        if (!hasSword1 && !hasSword2)
+        {
+            currentWeapon = WeaponType.None;
+        }
+        else if (currentWeapon == WeaponType.None)
+        {
+            if (hasSword2) currentWeapon = WeaponType.Sword2;
+            else if (hasSword1) currentWeapon = WeaponType.Sword1;
+        }
         UpdateWeaponState(currentWeapon);
 
         // ── UI Prompts shuru mein hide karo (sabhi bacchon ko chupa do) ──
@@ -536,8 +619,20 @@ public class PlayerController : MonoBehaviour
 
         CacheMainCamera();
 
-        // --- SAFE FALLBACK: If UIManager is missing in the scene, unlock player ---
+        // --- SAFE FALLBACK: If UIManager is missing in the scene, spawn it from Resources ---
         UIManager uiManager = FindFirstObjectByType<UIManager>();
+        if (uiManager == null)
+        {
+            GameObject uiPrefab = Resources.Load<GameObject>("Game UI");
+            if (uiPrefab != null)
+            {
+                GameObject spawnedUI = Instantiate(uiPrefab);
+                spawnedUI.name = "Game UI";
+                uiManager = spawnedUI.GetComponentInChildren<UIManager>();
+                Debug.Log("[PlayerController] Automatically spawned Game UI from Resources.");
+            }
+        }
+
         if (uiManager == null)
         {
             Debug.LogWarning("PlayerController: UIManager scene mein nahi mila! Input by default unlock kar raha hu.");
@@ -1577,9 +1672,19 @@ public class PlayerController : MonoBehaviour
             if (lampDrainCoroutine != null) StopCoroutine(lampDrainCoroutine);
             lampDrainCoroutine = StartCoroutine(DrainLampOil());
         }
+        else
+        {
+            if (handLampObject != null) handLampObject.SetActive(false);
+            if (handLampLight != null) handLampLight.enabled = false;
+            OnTorchStateChanged?.Invoke(false);
+        }
 
-        // Agar player ne koi sword pick ki thi toh usko hath me equip rakho
-        if (currentWeapon == WeaponType.None)
+        // Agar player ne koi sword pick ki thi toh usko hath me equip rakho, warna empty-handed
+        if (!hasSword1 && !hasSword2)
+        {
+            currentWeapon = WeaponType.None;
+        }
+        else if (currentWeapon == WeaponType.None)
         {
             if (hasSword2) currentWeapon = WeaponType.Sword2;
             else if (hasSword1) currentWeapon = WeaponType.Sword1;
@@ -1907,6 +2012,9 @@ public class PlayerController : MonoBehaviour
 
         // 4. UI ko batao ki torch utha li hai
         OnTorchStateChanged?.Invoke(true);
+
+        // State turant save karo taaki agle scene me Torch saath rahe
+        GameSaveManager.SaveGameState(this);
     }
 
     public bool isLampFrozen = false; // Pray trigger me ya Arena me lamp drain freeze
@@ -2091,6 +2199,9 @@ public class PlayerController : MonoBehaviour
         
         // UI ko batao ki torch chhod di hai
         OnTorchStateChanged?.Invoke(false);
+
+        // State update save karo
+        GameSaveManager.SaveGameState(this);
     }
 
     public void SetCombatState(bool enteringCombat)
@@ -2148,6 +2259,9 @@ public class PlayerController : MonoBehaviour
             activeGroundSword2 = groundSword;
             UpdateWeaponState(WeaponType.Sword2);
         }
+
+        // State turant save karo taaki agle scene me Weapon saath rahe
+        GameSaveManager.SaveGameState(this);
     }
 
     private void DropWeapon()
@@ -2185,6 +2299,7 @@ public class PlayerController : MonoBehaviour
 
         // Return to empty handed state after dropping weapon
         UpdateWeaponState(WeaponType.None);
+        GameSaveManager.SaveGameState(this);
     }
 
     public void UpdateWeaponState(WeaponType newWeapon)
@@ -2205,6 +2320,129 @@ public class PlayerController : MonoBehaviour
         if (animator != null)
         {
             animator.SetInteger("WeaponType", (int)currentWeapon);
+        }
+    }
+
+    /// <summary>
+    /// Guarantees that the equipped sword has a trigger collider and SwordDamage script.
+    /// This fixes sword attacks dealing 0 damage in Level 2 / Level 3 or any prefab instances.
+    /// </summary>
+    private void EnsureSwordComponents(GameObject swordObj)
+    {
+        if (swordObj == null) return;
+
+        // 1. Collider check (trigger collider for weapon hits)
+        Collider[] colliders = swordObj.GetComponentsInChildren<Collider>(true);
+        if (colliders == null || colliders.Length == 0)
+        {
+            BoxCollider col = swordObj.AddComponent<BoxCollider>();
+            col.isTrigger = true;
+            col.center = new Vector3(0f, 0f, 0.45f);
+            col.size = new Vector3(0.35f, 0.35f, 1.4f);
+        }
+        else
+        {
+            // Ensure at least one collider is a trigger
+            bool hasTrigger = false;
+            foreach (var c in colliders)
+            {
+                if (c.isTrigger)
+                {
+                    hasTrigger = true;
+                    break;
+                }
+            }
+            if (!hasTrigger && colliders.Length > 0)
+            {
+                colliders[0].isTrigger = true;
+            }
+        }
+
+        // 2. SwordDamage script check
+        SwordDamage sd = swordObj.GetComponentInChildren<SwordDamage>(true);
+        if (sd == null)
+        {
+            sd = swordObj.AddComponent<SwordDamage>();
+            sd.damageAmount = 100;
+        }
+    }
+
+    /// <summary>
+    /// AAA Active melee sweep: sweeps in front of the player during the swing window.
+    /// Prevents physics tunneling or missed trigger ticks on fast swings.
+    /// </summary>
+    private System.Collections.IEnumerator PerformMeleeHitSweep(float delay, float duration)
+    {
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+
+        float elapsed = 0f;
+        var hitEnemiesThisSwing = new System.Collections.Generic.HashSet<object>();
+
+        while (elapsed < duration)
+        {
+            Vector3 sweepCenter = transform.position + transform.forward * 1.5f + Vector3.up * 1f;
+            float sweepRadius = 1.8f;
+            Collider[] hits = Physics.OverlapSphere(sweepCenter, sweepRadius, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide);
+
+            for (int i = 0; i < hits.Length; i++)
+            {
+                Collider col = hits[i];
+                if (col == null || col.transform.root == transform.root) continue;
+
+                // Check DemonAi
+                DemonAi demon = col.GetComponent<DemonAi>() ?? col.GetComponentInParent<DemonAi>();
+                if (demon != null && !hitEnemiesThisSwing.Contains(demon))
+                {
+                    hitEnemiesThisSwing.Add(demon);
+                    if (Time.time >= SwordDamage.LastSwordDamageTime + 0.35f)
+                    {
+                        demon.TakeDamage(100);
+                        SwordDamage.LastSwordDamageTime = Time.time;
+                        Vector3 hitPt = col.ClosestPoint(sweepCenter);
+                        Vector3 norm = (transform.position - col.transform.position).normalized + Vector3.up * 0.4f;
+                        HitVFX.CreateSwordClashSparks(hitPt, norm);
+                        Debug.Log("<color=cyan>[PlayerController] Active Attack Sweep dealt 100 damage to DemonAi!</color>");
+                    }
+                    continue;
+                }
+
+                // Check EnemyAiNoPatrol
+                EnemyAiNoPatrol noPatrol = col.GetComponent<EnemyAiNoPatrol>() ?? col.GetComponentInParent<EnemyAiNoPatrol>();
+                if (noPatrol != null && !hitEnemiesThisSwing.Contains(noPatrol))
+                {
+                    hitEnemiesThisSwing.Add(noPatrol);
+                    if (Time.time >= SwordDamage.LastSwordDamageTime + 0.35f)
+                    {
+                        noPatrol.TakeDamage(100);
+                        SwordDamage.LastSwordDamageTime = Time.time;
+                        Vector3 hitPt = col.ClosestPoint(sweepCenter);
+                        Vector3 norm = (transform.position - col.transform.position).normalized + Vector3.up * 0.4f;
+                        HitVFX.CreateSwordClashSparks(hitPt, norm);
+                        Debug.Log("<color=cyan>[PlayerController] Active Attack Sweep dealt 100 damage to EnemyAiNoPatrol!</color>");
+                    }
+                    continue;
+                }
+
+                // Check BossEnemyAi
+                BossEnemyAi boss = col.GetComponent<BossEnemyAi>() ?? col.GetComponentInParent<BossEnemyAi>();
+                if (boss != null && !hitEnemiesThisSwing.Contains(boss))
+                {
+                    hitEnemiesThisSwing.Add(boss);
+                    if (Time.time >= SwordDamage.LastSwordDamageTime + 0.35f)
+                    {
+                        boss.TakeDamage(300);
+                        SwordDamage.LastSwordDamageTime = Time.time;
+                        Vector3 hitPt = col.ClosestPoint(sweepCenter);
+                        Vector3 norm = (transform.position - col.transform.position).normalized + Vector3.up * 0.4f;
+                        HitVFX.CreateSwordClashSparks(hitPt, norm);
+                        Debug.Log("<color=cyan>[PlayerController] Active Attack Sweep dealt 300 damage to BossEnemyAi!</color>");
+                    }
+                    continue;
+                }
+            }
+
+            elapsed += 0.05f;
+            yield return new WaitForSeconds(0.05f);
         }
     }
 
@@ -2257,6 +2495,9 @@ public class PlayerController : MonoBehaviour
 
         // Fire the trigger — animation will play at attackAnimSpeed
         animator.SetTrigger("Attack");
+
+        // Active forward hit detection guarantee (covers fast swings & scenes with prefab differences)
+        StartCoroutine(PerformMeleeHitSweep(0.08f, 0.28f));
 
         // Start auto-sampling the clip length for this combo step (if not yet cached)
         bool needsSample = (currentComboStep == 1 && _attackClipLen1 <= 0f)
