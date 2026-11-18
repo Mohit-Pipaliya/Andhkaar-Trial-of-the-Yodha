@@ -378,8 +378,7 @@ public class DemonAi : MonoBehaviour
         line.positionCount = 51;
         line.loop = true;
         
-        Material redMat = new Material(Shader.Find("Hidden/Internal-Colored"));
-        redMat.color = new Color(1f, 0f, 0f, 0.7f); 
+        Material redMat = SafeShaderUtil.CreateColoredMaterial(new Color(1f, 0f, 0f, 0.7f));
         line.material = redMat;
 
         for (int i = 0; i < 51; i++)

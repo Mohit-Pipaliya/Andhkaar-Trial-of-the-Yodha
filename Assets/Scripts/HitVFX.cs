@@ -14,10 +14,7 @@ public static class HitVFX
     {
         if (additiveMaterial == null)
         {
-            Shader shader = Shader.Find("Legacy Shaders/Particles/Additive");
-            if (shader == null) shader = Shader.Find("Particles/Standard Unlit");
-            if (shader == null) shader = Shader.Find("Sprites/Default");
-            additiveMaterial = new Material(shader);
+            additiveMaterial = SafeShaderUtil.CreateParticleMaterial();
         }
         return additiveMaterial;
     }

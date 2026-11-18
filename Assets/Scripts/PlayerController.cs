@@ -1353,9 +1353,7 @@ public class PlayerController : MonoBehaviour
         );
         Color glowColor = new Color(objLightColor.r, objLightColor.g, objLightColor.b, 0.35f);
 
-        Shader addShader = Shader.Find("Particles/Additive")
-                        ?? Shader.Find("Legacy Shaders/Particles/Additive")
-                        ?? Shader.Find("Sprites/Default");
+        Shader addShader = SafeShaderUtil.GetParticleShader();
 
         // ── BEAM THICKNESS (Ab jyada moti aur powerful hai) ──
         float coreW = worldUnit * 4.5f;   // Pehle 2.2 tha
@@ -2129,13 +2127,8 @@ public class PlayerController : MonoBehaviour
         indicator.startWidth = 0.2f;
         indicator.endWidth = 0.2f;
         
-        Shader defaultShader = Shader.Find("Sprites/Default");
-        if (defaultShader != null)
-        {
-            Material glowMat = new Material(defaultShader);
-            glowMat.color = new Color(0f, 1f, 0.2f, 0.5f); // Semi-transparent green
-            indicator.material = glowMat;
-        }
+        Material glowMat = SafeShaderUtil.CreateColoredMaterial(new Color(0f, 1f, 0.2f, 0.5f));
+        indicator.material = glowMat;
     }
 
     private void RefillLamp(GameObject oilCan)

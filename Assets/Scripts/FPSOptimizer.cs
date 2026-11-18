@@ -402,9 +402,7 @@ public class FPSOptimizer : MonoBehaviour
         shape.shapeType  = ParticleSystemShapeType.Sphere;
         shape.radius     = 0.2f;
 
-        Shader defaultShader = Shader.Find("Sprites/Default");
-        if (defaultShader != null)
-            ps.GetComponent<ParticleSystemRenderer>().material = new Material(defaultShader);
+        ps.GetComponent<ParticleSystemRenderer>().material = SafeShaderUtil.CreateParticleMaterial();
 
         sparkObj.SetActive(false);
         return sparkObj;

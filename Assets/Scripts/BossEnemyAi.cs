@@ -392,8 +392,7 @@ public class BossEnemyAi : MonoBehaviour
         line.positionCount = 51;
         line.loop = true;
         
-        Material purpleMat = new Material(Shader.Find("Hidden/Internal-Colored"));
-        purpleMat.color = new Color(0.5f, 0f, 1f, 0.7f); // Boss ke liye Purple/Dark color arena
+        Material purpleMat = SafeShaderUtil.CreateColoredMaterial(new Color(0.5f, 0f, 1f, 0.7f));
         line.material = purpleMat;
 
         float angle = 0f;

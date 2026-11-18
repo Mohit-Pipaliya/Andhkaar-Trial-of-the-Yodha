@@ -100,15 +100,7 @@ public class ExtremeHorrorVFX : MonoBehaviour
         col.color = grad;
 
         ParticleSystemRenderer renderer = fog.GetComponent<ParticleSystemRenderer>();
-        Material defaultMat = new Material(Shader.Find("Particles/Standard Unlit"));
-        defaultMat.SetFloat("_Mode", 2); // Fade
-        defaultMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        defaultMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        defaultMat.SetInt("_ZWrite", 0);
-        defaultMat.DisableKeyword("_ALPHATEST_ON");
-        defaultMat.EnableKeyword("_ALPHABLEND_ON");
-        defaultMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-        defaultMat.renderQueue = 3000;
+        Material defaultMat = SafeShaderUtil.CreateParticleMaterial();
         if (Application.isPlaying) renderer.material = defaultMat;
         else renderer.sharedMaterial = defaultMat;
     }
@@ -153,7 +145,7 @@ public class ExtremeHorrorVFX : MonoBehaviour
         colorLife.color = grad;
 
         ParticleSystemRenderer renderer = emberObj.GetComponent<ParticleSystemRenderer>();
-        Material mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        Material mat = SafeShaderUtil.CreateParticleMaterial();
         mat.SetColor("_Color", Color.red);
         mat.EnableKeyword("_EMISSION");
         mat.SetColor("_EmissionColor", Color.red * 10f); // Embers ko chamkane ke liye

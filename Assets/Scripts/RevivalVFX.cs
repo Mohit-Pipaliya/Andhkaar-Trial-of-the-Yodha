@@ -85,10 +85,7 @@ public class RevivalVFX : MonoBehaviour
         colOverLifetime.color = emberGrad;
 
         var emberRenderer = emberObj.GetComponent<ParticleSystemRenderer>();
-        Shader addShader = Shader.Find("Legacy Shaders/Particles/Additive");
-        if (addShader == null) addShader = Shader.Find("Particles/Standard Unlit");
-        if (addShader == null) addShader = Shader.Find("Sprites/Default");
-        emberRenderer.material = new Material(addShader);
+        emberRenderer.material = SafeShaderUtil.CreateParticleMaterial();
 
         emberPS.Play();
 
@@ -115,7 +112,7 @@ public class RevivalVFX : MonoBehaviour
         rShape.radius = 0.1f;
 
         var rRenderer = ringPS.GetComponent<ParticleSystemRenderer>();
-        rRenderer.material = new Material(addShader);
+        rRenderer.material = SafeShaderUtil.CreateParticleMaterial();
 
         ringPS.Play();
 
@@ -141,9 +138,7 @@ public class RevivalVFX : MonoBehaviour
         sShape.radius = 0.4f;
 
         var sRenderer = smokePS.GetComponent<ParticleSystemRenderer>();
-        Shader alphaShader = Shader.Find("Legacy Shaders/Particles/Alpha Blended");
-        if (alphaShader == null) alphaShader = Shader.Find("Sprites/Default");
-        sRenderer.material = new Material(alphaShader);
+        sRenderer.material = SafeShaderUtil.CreateParticleMaterial();
 
         smokePS.Play();
 

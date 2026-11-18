@@ -22,11 +22,7 @@ public class SoulEffect : MonoBehaviour
         ApplyGiantScale();
 
         // 1. Create a glowing additive material for the magma overlay
-        Shader soulShader = Shader.Find("Legacy Shaders/Particles/Additive");
-        if (soulShader == null) soulShader = Shader.Find("Particles/Standard Unlit");
-        if (soulShader == null) soulShader = Shader.Find("Sprites/Default");
-
-        soulMaterial = new Material(soulShader);
+        soulMaterial = SafeShaderUtil.CreateParticleMaterial();
         soulMaterial.SetColor("_TintColor", fireColor);
         soulMaterial.SetColor("_Color", fireColor);
         soulMaterial.SetColor("_EmissionColor", fireColor * 2.0f);
@@ -148,16 +144,11 @@ public class SoulEffect : MonoBehaviour
         );
         colorOverLifetime.color = grad;
 
-        // Use a default alpha blended material for smoke
+        // Use a safe particle material for smoke
         ParticleSystemRenderer psr = fogObj.GetComponent<ParticleSystemRenderer>();
-        Shader smokeShader = Shader.Find("Legacy Shaders/Particles/Alpha Blended");
-        if (smokeShader == null) smokeShader = Shader.Find("Particles/Standard Unlit");
-        if (smokeShader != null)
-        {
-            Material smokeMat = new Material(smokeShader);
-            if (smokeMat.HasProperty("_TintColor")) smokeMat.SetColor("_TintColor", smokeColor);
-            psr.material = smokeMat;
-        }
+        Material smokeMat = SafeShaderUtil.CreateParticleMaterial();
+        if (smokeMat.HasProperty("_TintColor")) smokeMat.SetColor("_TintColor", smokeColor);
+        psr.material = smokeMat;
     }
 
     private void AddGlowingEyes()

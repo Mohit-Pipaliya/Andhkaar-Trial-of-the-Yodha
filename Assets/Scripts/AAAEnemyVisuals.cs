@@ -109,19 +109,9 @@ public class AAAEnemyVisuals : MonoBehaviour
         );
         colorOverLifetime.color = grad;
 
-        // Note: Default particle material is pink if we don't assign one, but we use the default Particle Material
+        // Safe URP/Standalone material to prevent pink shaders
         ParticleSystemRenderer renderer = ps.GetComponent<ParticleSystemRenderer>();
-        Material defaultMat = new Material(Shader.Find("Particles/Standard Unlit"));
-        
-        // Setup material for transparent fading
-        defaultMat.SetFloat("_Mode", 2); // Fade mode
-        defaultMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        defaultMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        defaultMat.SetInt("_ZWrite", 0);
-        defaultMat.DisableKeyword("_ALPHATEST_ON");
-        defaultMat.EnableKeyword("_ALPHABLEND_ON");
-        defaultMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-        defaultMat.renderQueue = 3000;
+        Material defaultMat = SafeShaderUtil.CreateParticleMaterial();
         
         if (Application.isPlaying) renderer.material = defaultMat;
         else renderer.sharedMaterial = defaultMat;

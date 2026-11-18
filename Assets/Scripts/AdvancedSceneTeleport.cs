@@ -372,8 +372,7 @@ public class AdvancedSceneTeleport : MonoBehaviour
         // Keep the original rotation to match the gate orientation
         psObj.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
 
-        Shader unlitShader = Shader.Find("Particles/Standard Unlit");
-        if (unlitShader == null) unlitShader = Shader.Find("Legacy Shaders/Particles/Additive");
+        Shader unlitShader = SafeShaderUtil.GetParticleShader();
 
         // --- 1. DARK VOID (Black hole in the middle) ---
         GameObject voidObj = new GameObject("PortalVoid");
@@ -498,9 +497,7 @@ public class AdvancedSceneTeleport : MonoBehaviour
         smCol.color = CreateFadeGradient(new Color(1f, 0.3f, 0f, 0.8f), new Color(0f, 0f, 0f, 0f));
         
         ParticleSystemRenderer smPsr = smokePs.GetComponent<ParticleSystemRenderer>();
-        Shader alphaShader = Shader.Find("Legacy Shaders/Particles/Alpha Blended");
-        if (alphaShader == null) alphaShader = unlitShader;
-        if (alphaShader != null) smPsr.material = new Material(alphaShader);
+        smPsr.material = SafeShaderUtil.CreateParticleMaterial();
         smPsr.sortingOrder = 2; // Behind sparks, in front of void
 
         voidPs.Play();

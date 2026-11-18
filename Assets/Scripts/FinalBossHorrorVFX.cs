@@ -210,18 +210,10 @@ public class FinalBossHorrorVFX : MonoBehaviour
         col.color = grad;
 
         ParticleSystemRenderer renderer = ring.GetComponent<ParticleSystemRenderer>();
-        Material mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        Material mat = SafeShaderUtil.CreateParticleMaterial();
         mat.SetColor("_Color", Color.white);
         mat.EnableKeyword("_EMISSION");
         mat.SetColor("_EmissionColor", Color.red * 8f); // Aag ko chamkane ke liye
-        mat.SetFloat("_Mode", 2); 
-        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        mat.SetInt("_ZWrite", 0);
-        mat.DisableKeyword("_ALPHATEST_ON");
-        mat.EnableKeyword("_ALPHABLEND_ON");
-        mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-        mat.renderQueue = 3000;
         if (Application.isPlaying) renderer.material = mat;
         else renderer.sharedMaterial = mat;
     }
@@ -250,7 +242,7 @@ public class FinalBossHorrorVFX : MonoBehaviour
         tr.startWidth = 0.05f;
         tr.endWidth = 0f;
         
-        Material mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        Material mat = SafeShaderUtil.CreateParticleMaterial();
         mat.SetColor("_Color", Color.red);
         mat.EnableKeyword("_EMISSION");
         mat.SetColor("_EmissionColor", Color.red * 10f); // Chamakti hui laal trail
@@ -288,15 +280,7 @@ public class FinalBossHorrorVFX : MonoBehaviour
     void SetupParticleMaterial(GameObject go)
     {
         ParticleSystemRenderer renderer = go.GetComponent<ParticleSystemRenderer>();
-        Material defaultMat = new Material(Shader.Find("Particles/Standard Unlit"));
-        defaultMat.SetFloat("_Mode", 2); // Fade
-        defaultMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        defaultMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        defaultMat.SetInt("_ZWrite", 0);
-        defaultMat.DisableKeyword("_ALPHATEST_ON");
-        defaultMat.EnableKeyword("_ALPHABLEND_ON");
-        defaultMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-        defaultMat.renderQueue = 3000;
+        Material defaultMat = SafeShaderUtil.CreateParticleMaterial();
         if (Application.isPlaying) renderer.material = defaultMat;
         else renderer.sharedMaterial = defaultMat;
     }
