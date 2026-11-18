@@ -524,9 +524,9 @@ public class PlayerController : MonoBehaviour
         }
 
         // Harmonize lamp drain rate across all levels so it never drains faster than Scene 1
-        if (lampDrainRate > 3f)
+        if (lampDrainRate > 0.05f)
         {
-            lampDrainRate = 3f;
+            lampDrainRate = 0.05f;
         }
 
         InitializeSpawnPoints();
@@ -2371,10 +2371,18 @@ public class PlayerController : MonoBehaviour
         float elapsed = 0f;
         var hitEnemiesThisSwing = new System.Collections.Generic.HashSet<object>();
 
+        // Scale-aware sweep parameters (supports standard scale & large scale models in Level 2/3)
+        float charHeight = (controller != null && controller.height > 0.05f) ? controller.height : 2.0f;
+        float worldHeight = charHeight * Mathf.Max(transform.lossyScale.y, 1f);
+        if (worldHeight < 1.5f || worldHeight > 40f) worldHeight = 2.5f;
+
+        float forwardReach = Mathf.Max(2.5f, worldHeight * 0.8f);
+        float upOffset = Mathf.Max(1.0f, worldHeight * 0.45f);
+        float sweepRadius = Mathf.Max(3.2f, worldHeight * 0.8f);
+
         while (elapsed < duration)
         {
-            Vector3 sweepCenter = transform.position + transform.forward * 1.5f + Vector3.up * 1f;
-            float sweepRadius = 1.8f;
+            Vector3 sweepCenter = transform.position + transform.forward * forwardReach + Vector3.up * upOffset;
             Collider[] hits = Physics.OverlapSphere(sweepCenter, sweepRadius, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide);
 
             for (int i = 0; i < hits.Length; i++)
@@ -2431,6 +2439,26 @@ public class PlayerController : MonoBehaviour
                         Debug.Log("<color=cyan>[PlayerController] Active Attack Sweep dealt 300 damage to BossEnemyAi!</color>");
                     }
                     continue;
+                }
+
+                // Universal fallback for any GameObject tagged Enemy in any scene
+                if (col.CompareTag("Enemy") || col.transform.root.CompareTag("Enemy"))
+                {
+                    object enemyKey = col.transform.root;
+                    if (!hitEnemiesThisSwing.Contains(enemyKey))
+                    {
+                        hitEnemiesThisSwing.Add(enemyKey);
+                        if (Time.time >= SwordDamage.LastSwordDamageTime + 0.35f)
+                        {
+                            col.SendMessage("TakeDamage", 100, SendMessageOptions.DontRequireReceiver);
+                            col.transform.root.SendMessage("TakeDamage", 100, SendMessageOptions.DontRequireReceiver);
+                            SwordDamage.LastSwordDamageTime = Time.time;
+                            Vector3 hitPt = col.ClosestPoint(sweepCenter);
+                            Vector3 norm = (transform.position - col.transform.position).normalized + Vector3.up * 0.4f;
+                            HitVFX.CreateSwordClashSparks(hitPt, norm);
+                            Debug.Log("<color=cyan>[PlayerController] Universal Enemy fallback dealt 100 damage!</color>");
+                        }
+                    }
                 }
             }
 
