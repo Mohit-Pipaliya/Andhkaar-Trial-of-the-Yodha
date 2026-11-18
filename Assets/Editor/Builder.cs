@@ -14,6 +14,7 @@ public static class Builder
         "Assets/Scenes/Level 3.unity"
     };
 
+    [MenuItem("Build Game/Build Mac Standalone")]
     public static void BuildMac()
     {
         string buildDir = Path.Combine(Directory.GetCurrentDirectory(), "Builds", "Mac");
@@ -23,6 +24,7 @@ public static class Builder
         Build(outputPath, BuildTarget.StandaloneOSX, BuildTargetGroup.Standalone);
     }
 
+    [MenuItem("Build Game/Build Windows Standalone")]
     public static void BuildWindows()
     {
         string buildDir = Path.Combine(Directory.GetCurrentDirectory(), "Builds", "Windows");

@@ -11,13 +11,13 @@ public class UIManager : MonoBehaviour
     public static bool isGameActive = false;
     private static bool hasStartedOnce = false;
 
-#if UNITY_EDITOR
+    // Build + Editor dono me work karta hai — static vars ko reset karta hai domain reload ke bina
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void Init()
     {
         hasStartedOnce = false;
+        isGameActive = false;
     }
-#endif
 
     [Header("--- UI Panels ---")]
     public GameObject loadingPanel;

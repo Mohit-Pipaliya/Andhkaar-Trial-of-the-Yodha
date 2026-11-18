@@ -76,8 +76,11 @@ public class FPSOptimizer : MonoBehaviour
         EnsureManagersExist();
         ApplyOptimizations();
 
+        // InGameProfiler sirf Development Build ya Editor me add karo — Release build me nahi
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (gameObject.GetComponent<InGameProfiler>() == null)
             gameObject.AddComponent<InGameProfiler>();
+#endif
     }
 
     void OnEnable()
