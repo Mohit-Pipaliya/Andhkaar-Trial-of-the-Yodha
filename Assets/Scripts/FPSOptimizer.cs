@@ -239,10 +239,10 @@ public class FPSOptimizer : MonoBehaviour
         {
             if (cam == null || !cam.enabled) continue;
 
-            // Always SET (not cap) — overrides any stale Inspector/scene values
-            cam.farClipPlane   = 350f;
-            cam.nearClipPlane  = 0.1f;
-            cam.useOcclusionCulling = true;
+            // Keep full camera draw distance so terrain is never clipped
+            cam.farClipPlane   = 1000f;
+            cam.nearClipPlane  = 0.3f;
+            cam.useOcclusionCulling = false; // Disable runtime occlusion culling unless baked to prevent pop-in
 
             // Per-camera URP data — enable depth texture for post-processing effects
             UniversalAdditionalCameraData urpCam = cam.GetUniversalAdditionalCameraData();
@@ -263,33 +263,31 @@ public class FPSOptimizer : MonoBehaviour
         {
             if (terrain == null) continue;
 
-            terrain.drawInstanced        = true;            // GPU instanced terrain rendering
-            terrain.treeDistance         = 250f;            // Trees visible further
-            terrain.treeBillboardDistance = 80f;            // billboards transition
-            terrain.detailObjectDistance = 150f;            // AAA Fix: Grass visible much further (was 80)
-            terrain.detailObjectDensity  = 1.0f;            // AAA Fix: Full lush grass density
-            terrain.treeMaximumFullLODCount = 15;
-            terrain.heightmapPixelError  = 10f;             // slightly lower terrain LOD
+            terrain.drawHeightmap        = true;            // MUST BE TRUE so terrain ground is visible!
+            terrain.drawInstanced        = false;           // KEEP FALSE: GPU instancing breaks URP terrain on Mac Metal!
+            terrain.treeDistance         = 5000f;           // Match scene original (was 5000)
+            terrain.treeBillboardDistance = 100f;
+            terrain.detailObjectDistance = 400f;            // Match Level 1 crisp grass view distance
+            terrain.detailObjectDensity  = 1.0f;            // Full lush grass density
+            terrain.treeMaximumFullLODCount = 50;
+            terrain.heightmapPixelError  = 5f;              // Match scene original crisp heightmap
             terrain.drawTreesAndFoliage  = true;
         }
     }
 
     /// <summary>
-    /// AAA Atmospheric Fog.
-    /// ExponentialSquared gives a much more realistic, thick atmospheric feel
-    /// than Linear, blending smoothly from the camera into the distance.
-    /// IMPORTANT: We do NOT touch RenderSettings.ambientMode or ambientLight here.
-    /// PlayerController.cs already manages ambient lighting based on torch state.
+    /// Keep scene fog as authored by developer.
+    /// Do not blanket the scene in thick 350m blue fog which hides the terrain.
     /// </summary>
     private void ApplyRealisticFog()
     {
-        RenderSettings.fog             = true;
-        RenderSettings.fogMode         = FogMode.Linear;
-        RenderSettings.fogStartDistance = 120f;   // Completely clear in the foreground
-        RenderSettings.fogEndDistance   = 350f;   // Fully thick at the horizon to hide the empty blue edge
-        
-        // Dark blue-grey fog to blend seamlessly with the sky background
-        RenderSettings.fogColor = new Color(0.15f, 0.22f, 0.35f, 1f);
+        // Respect original scene settings: all 3 levels have fog disabled (m_Fog: 0)
+        // If developer enabled fog, do not clamp it to 350m
+        if (RenderSettings.fog)
+        {
+            RenderSettings.fogStartDistance = 250f;
+            RenderSettings.fogEndDistance   = 1000f;
+        }
     }
 
     private void EnforceAAAShadows()
